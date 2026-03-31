@@ -1,23 +1,591 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ChlamyDesign</title>
+<title>ChlamyDesign — Chloroplast Gene Optimizer</title>
 <style>
-body{font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f7f6f3;color:#1a1a18}
-.card{text-align:center;padding:48px;background:#fff;border-radius:16px;border:1px solid #d8d7d2;max-width:500px}
-h1{color:#0f6e56;margin:0 0 8px}
-p{color:#5c5b56;margin:4px 0}
-.badge{display:inline-block;margin-top:16px;padding:6px 16px;background:#e1f5ee;color:#0f6e56;border-radius:20px;font-size:13px;font-weight:600}
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --green:    #0f6e56;
+  --green-lt: #e1f5ee;
+  --green-md: #c3ead9;
+  --amber:    #b45309;
+  --amber-lt: #fef3c7;
+  --red:      #dc2626;
+  --red-lt:   #fee2e2;
+  --bg:       #f7f6f3;
+  --surface:  #ffffff;
+  --border:   #e2e1dc;
+  --muted:    #6b6b65;
+  --text:     #1a1a18;
+  --radius:   12px;
+  --shadow:   0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
+}
+html { font-size: 15px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+/* ── Layout ── */
+header {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(247,246,243,.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 52px;
+}
+.logo { font-weight: 700; font-size: 1.1rem; color: var(--green); letter-spacing: -.3px; }
+.logo span { color: var(--text); font-weight: 400; font-size: .8rem; margin-left: 8px; opacity: .6; }
+.badge-header {
+  font-size: 11px; font-weight: 600; padding: 3px 10px;
+  background: var(--green-lt); color: var(--green);
+  border-radius: 20px; letter-spacing: .2px;
+}
+
+main { max-width: 880px; margin: 0 auto; padding: 40px 24px 80px; }
+
+h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -.4px; margin-bottom: 4px; }
+.subtitle { color: var(--muted); font-size: .9rem; margin-bottom: 32px; }
+.subtitle em { font-style: italic; }
+
+/* ── Cards ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.card-title {
+  font-size: .75rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .8px; color: var(--muted); margin-bottom: 14px;
+}
+
+/* ── Form ── */
+label { display: block; font-size: .875rem; font-weight: 500; margin-bottom: 6px; }
+textarea {
+  width: 100%; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: 8px;
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+  font-size: .8rem; line-height: 1.7;
+  background: #fafaf9; color: var(--text);
+  resize: vertical; min-height: 120px;
+  transition: border-color .15s;
+  outline: none;
+}
+textarea:focus { border-color: var(--green); background: var(--surface); }
+textarea.error { border-color: var(--red); background: var(--red-lt); }
+.seq-hint {
+  font-size: .78rem; color: var(--muted); margin-top: 6px;
+  display: flex; justify-content: space-between;
+}
+.seq-len { font-variant-numeric: tabular-nums; }
+
+/* ── Strategy Pills ── */
+.strategy-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.strategy-pill {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 8px; cursor: pointer;
+  border: 1.5px solid var(--border); background: var(--surface);
+  font-size: .85rem; font-weight: 500;
+  transition: border-color .15s, background .15s;
+  user-select: none;
+}
+.strategy-pill input { display: none; }
+.strategy-pill:has(input:checked) {
+  border-color: var(--green); background: var(--green-lt); color: var(--green);
+}
+.strategy-pill .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: currentColor; opacity: .5;
+}
+.strategy-pill:has(input:checked) .dot { opacity: 1; }
+.strategy-pill.disabled { opacity: .45; cursor: not-allowed; }
+.strategy-tag {
+  font-size: 10px; font-weight: 700; padding: 1px 5px;
+  background: var(--green-md); color: var(--green); border-radius: 4px;
+  margin-left: 2px;
+}
+
+/* ── Button ── */
+.btn-run {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--green); color: #fff;
+  border: none; border-radius: 8px; cursor: pointer;
+  font-size: .9rem; font-weight: 600; padding: 11px 24px;
+  transition: background .15s, transform .1s;
+  letter-spacing: -.1px;
+}
+.btn-run:hover { background: #0b5c47; }
+.btn-run:active { transform: scale(.97); }
+.btn-run:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.btn-run svg { flex-shrink: 0; }
+
+/* ── Error msg ── */
+.err-msg {
+  color: var(--red); font-size: .82rem; margin-top: 8px;
+  display: none; align-items: center; gap: 6px;
+}
+.err-msg.visible { display: flex; }
+
+/* ── Results ── */
+#results { display: none; }
+#results.visible { display: block; }
+
+.metrics-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px; margin-bottom: 20px;
+}
+.metric-box {
+  background: #fafaf9; border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px;
+}
+.metric-label { font-size: .72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 4px; }
+.metric-value { font-size: 1.4rem; font-weight: 700; letter-spacing: -.5px; }
+.metric-sub { font-size: .75rem; color: var(--muted); margin-top: 2px; }
+.metric-bar { height: 4px; border-radius: 2px; background: var(--border); margin-top: 8px; overflow: hidden; }
+.metric-bar-fill { height: 100%; border-radius: 2px; background: var(--green); transition: width .6s cubic-bezier(.4,0,.2,1); }
+.metric-bar-fill.warn { background: var(--amber); }
+.metric-bar-fill.bad  { background: var(--red); }
+
+.dna-wrap {
+  position: relative;
+  background: #fafaf9; border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; font-family: "SF Mono","Fira Code",Consolas,monospace;
+  font-size: .78rem; line-height: 1.8; color: #1a1a18;
+  word-break: break-all; max-height: 220px; overflow-y: auto;
+}
+.dna-wrap .codon { display: inline; }
+.dna-wrap .codon:nth-child(3n+1) { color: #0f6e56; }
+.dna-wrap .codon:nth-child(3n+2) { color: #1d4ed8; }
+.dna-wrap .codon:nth-child(3n)   { color: #7c3aed; }
+
+.copy-btn {
+  position: absolute; top: 10px; right: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 10px; font-size: .75rem; font-weight: 500;
+  cursor: pointer; color: var(--muted); transition: color .15s, border-color .15s;
+}
+.copy-btn:hover { color: var(--green); border-color: var(--green); }
+
+.dl-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.btn-dl {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 7px; font-size: .83rem; font-weight: 500;
+  cursor: pointer; border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); text-decoration: none;
+  transition: border-color .15s, color .15s;
+}
+.btn-dl:hover { border-color: var(--green); color: var(--green); }
+
+/* ── GC gauge ── */
+.gc-target-note {
+  font-size: .78rem; color: var(--muted); margin-top: 6px;
+  display: flex; align-items: center; gap: 6px;
+}
+.gc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+
+/* ── Info section ── */
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 600px) { .info-grid { grid-template-columns: 1fr; } }
+.info-item { font-size: .85rem; }
+.info-item dt { font-weight: 600; color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
+.info-item dd { color: var(--text); }
+
+/* ── Footer ── */
+footer {
+  text-align: center; padding: 24px;
+  font-size: .78rem; color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+footer a { color: var(--green); text-decoration: none; }
+
+/* ── Spinner ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
 </style>
 </head>
 <body>
-<div class="card">
-<h1>ChlamyDesign</h1>
-<p>AI-powered gene design for <em>C. reinhardtii</em> chloroplast</p>
-<p style="font-size:13px;color:#8a8983;margin-top:12px">Waseda University — Nishimura Lab</p>
-<span class="badge">Coming Soon</span>
-</div>
+
+<header>
+  <div class="logo">ChlamyDesign <span>Chloroplast Gene Optimizer</span></div>
+  <span class="badge-header">Beta</span>
+</header>
+
+<main>
+  <h2>Optimize your gene for<br><em>C. reinhardtii</em> chloroplast expression</h2>
+  <p class="subtitle">
+    Enter a protein sequence to generate a codon-optimized DNA sequence
+    adapted to the chloroplast codon usage of <em>Chlamydomonas reinhardtii</em> (GC ~34%).
+  </p>
+
+  <!-- Input -->
+  <div class="card">
+    <div class="card-title">Protein Sequence</div>
+    <label for="seq-input">Amino acid sequence (single-letter code)</label>
+    <textarea
+      id="seq-input"
+      placeholder="MSPQTETKASVGFKAGVKEYKLTYYTPEYETKDTDILAAFRVTPQPG..."
+      spellcheck="false"
+      autocomplete="off"
+    ></textarea>
+    <div class="seq-hint">
+      <span>Standard amino acids only (A-Z, no gaps). Stop symbol * or _ optional.</span>
+      <span class="seq-len" id="seq-len">0 aa</span>
+    </div>
+    <div class="err-msg" id="err-msg">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 4a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0V5zm-.75 6.5a.875.875 0 1 0 0 1.75.875.875 0 0 0 0-1.75z"/></svg>
+      <span id="err-text"></span>
+    </div>
+  </div>
+
+  <!-- Strategy -->
+  <div class="card">
+    <div class="card-title">Optimization Strategy</div>
+    <div class="strategy-group">
+      <label class="strategy-pill">
+        <input type="radio" name="strategy" value="cai_max" checked>
+        <span class="dot"></span> CAI-max
+      </label>
+      <label class="strategy-pill">
+        <input type="radio" name="strategy" value="bfc">
+        <span class="dot"></span> BFC <span class="strategy-tag">stochastic</span>
+      </label>
+      <label class="strategy-pill disabled" title="Available after model training">
+        <input type="radio" name="strategy" value="chlamyct" disabled>
+        <span class="dot"></span> ChlamyCT <span class="strategy-tag">soon</span>
+      </label>
+    </div>
+    <p style="font-size:.8rem;color:var(--muted);margin-top:10px">
+      <strong>CAI-max</strong>: always selects the most frequent codon per amino acid (~29% GC, maximum CSI).<br>
+      <strong>BFC</strong>: samples codons proportionally to their frequency, matching natural GC% (~33%).
+    </p>
+  </div>
+
+  <!-- Run -->
+  <button class="btn-run" id="run-btn" onclick="runOptimization()">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg>
+    Optimize
+  </button>
+
+  <!-- Results -->
+  <div id="results">
+    <div class="card" style="margin-top:20px">
+      <div class="card-title">Metrics</div>
+      <div class="metrics-grid">
+        <div class="metric-box">
+          <div class="metric-label">GC Content</div>
+          <div class="metric-value" id="m-gc">—</div>
+          <div class="metric-bar"><div class="metric-bar-fill" id="m-gc-bar" style="width:0%"></div></div>
+          <div class="gc-target-note"><span class="gc-dot"></span> Target: ~34%</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">Length</div>
+          <div class="metric-value" id="m-len">—</div>
+          <div class="metric-sub" id="m-len-sub"></div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">CSI Score</div>
+          <div class="metric-value" id="m-csi">—</div>
+          <div class="metric-bar"><div class="metric-bar-fill" id="m-csi-bar" style="width:0%"></div></div>
+          <div class="metric-sub">Codon–chloroplast adaptation</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">Start / Stop</div>
+          <div class="metric-value" style="font-size:1.1rem" id="m-startstop">—</div>
+          <div class="metric-sub" id="m-startstop-sub"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Optimized DNA Sequence</div>
+      <div class="dna-wrap" id="dna-output">
+        <button class="copy-btn" onclick="copyDNA()">Copy</button>
+        <div id="dna-colored"></div>
+      </div>
+      <div class="dl-row">
+        <button class="btn-dl" onclick="downloadFasta()">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7.25 10.44V2.75a.75.75 0 0 1 1.5 0v7.69l2.97-2.97a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L3.22 8.53a.75.75 0 0 1 1.06-1.06l2.97 2.97z"/></svg>
+          FASTA
+        </button>
+        <button class="btn-dl" onclick="downloadCSV()">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7.25 10.44V2.75a.75.75 0 0 1 1.5 0v7.69l2.97-2.97a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L3.22 8.53a.75.75 0 0 1 1.06-1.06l2.97 2.97z"/></svg>
+          CSV
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info -->
+  <div class="card" style="margin-top:8px">
+    <div class="card-title">About ChlamyDesign</div>
+    <dl class="info-grid">
+      <div class="info-item"><dt>Organism</dt><dd><em>Chlamydomonas reinhardtii</em> chloroplast</dd></div>
+      <div class="info-item"><dt>Codon table</dt><dd>Plastid code (Table 11) · 69 reference genes</dd></div>
+      <div class="info-item"><dt>Target GC%</dt><dd>~34% (vs nuclear ~64%)</dd></div>
+      <div class="info-item"><dt>Model</dt><dd>ChlamyCodonTransformer (fine-tuning in progress)</dd></div>
+      <div class="info-item"><dt>Institution</dt><dd>Waseda University — Nishimura Lab</dd></div>
+      <div class="info-item"><dt>Reference genome</dt><dd>GenBank BK000554</dd></div>
+    </dl>
+  </div>
+</main>
+
+<footer>
+  ChlamyDesign · Waseda University ·
+  <a href="https://github.com/yamauchiyuhei/ChlamyDesign" target="_blank">GitHub</a>
+</footer>
+
+<script>
+// ── C. reinhardtii chloroplast codon frequency table
+// Derived from BK000554 (69 protein-coding genes, ~34% GC)
+// Format: AA -> { codon: relative_frequency (0-1) }
+const CODON_FREQ = {
+  A: { GCT:0.42, GCA:0.30, GCC:0.17, GCG:0.11 },
+  R: { AGA:0.40, AGG:0.20, CGT:0.18, CGA:0.12, CGC:0.06, CGG:0.04 },
+  N: { AAT:0.62, AAC:0.38 },
+  D: { GAT:0.65, GAC:0.35 },
+  C: { TGT:0.58, TGC:0.42 },
+  Q: { CAA:0.72, CAG:0.28 },
+  E: { GAA:0.68, GAG:0.32 },
+  G: { GGT:0.38, GGA:0.32, GGC:0.16, GGG:0.14 },
+  H: { CAT:0.58, CAC:0.42 },
+  I: { ATT:0.50, ATA:0.35, ATC:0.15 },
+  L: { TTA:0.35, TTG:0.24, CTT:0.18, CTA:0.13, CTG:0.06, CTC:0.04 },
+  K: { AAA:0.70, AAG:0.30 },
+  M: { ATG:1.00 },
+  F: { TTT:0.60, TTC:0.40 },
+  P: { CCT:0.38, CCA:0.32, CCC:0.18, CCG:0.12 },
+  S: { TCT:0.28, TCA:0.24, AGT:0.20, AGC:0.14, TCC:0.08, TCG:0.06 },
+  T: { ACT:0.38, ACA:0.32, ACC:0.18, ACG:0.12 },
+  W: { TGG:1.00 },
+  Y: { TAT:0.62, TAC:0.38 },
+  V: { GTT:0.40, GTA:0.30, GTC:0.16, GTG:0.14 },
+};
+
+const STOP_CODONS = ['TAA','TAG','TGA'];
+const VALID_AA = new Set('ACDEFGHIKLMNPQRSTVWY');
+
+let lastDNA = '';
+let lastProtein = '';
+
+// ── Sequence length counter
+document.getElementById('seq-input').addEventListener('input', function() {
+  const clean = cleanProtein(this.value);
+  const len = clean.replace(/[_*]/g, '').length;
+  document.getElementById('seq-len').textContent = len + ' aa';
+  clearError();
+  if (document.getElementById('results').classList.contains('visible')) {
+    document.getElementById('results').classList.remove('visible');
+  }
+});
+
+function cleanProtein(raw) {
+  return raw.trim().toUpperCase().replace(/\s+/g,'');
+}
+
+function validateProtein(seq) {
+  if (!seq || seq.length === 0) return 'Please enter a protein sequence.';
+  const core = seq.replace(/[_*]$/, '');
+  if (core.length < 3) return 'Sequence must be at least 3 amino acids.';
+  if (core.length > 3000) return 'Sequence too long (max 3000 aa).';
+  for (const aa of core) {
+    if (!VALID_AA.has(aa)) return `Invalid amino acid: "${aa}". Use standard single-letter codes.`;
+  }
+  return null;
+}
+
+function showError(msg) {
+  document.getElementById('seq-input').classList.add('error');
+  document.getElementById('err-text').textContent = msg;
+  document.getElementById('err-msg').classList.add('visible');
+}
+function clearError() {
+  document.getElementById('seq-input').classList.remove('error');
+  document.getElementById('err-msg').classList.remove('visible');
+}
+
+// ── Optimization
+function sampleCodon(freqs) {
+  const r = Math.random();
+  let cum = 0;
+  const entries = Object.entries(freqs);
+  for (const [codon, freq] of entries) {
+    cum += freq;
+    if (r <= cum) return codon;
+  }
+  return entries[entries.length - 1][0];
+}
+
+function optimize(protein, strategy) {
+  let dna = '';
+  for (const aa of protein) {
+    if (aa === '_' || aa === '*') break;
+    const freqs = CODON_FREQ[aa];
+    if (!freqs) { dna += 'NNN'; continue; }
+    if (strategy === 'cai_max') {
+      // pick the codon with highest frequency
+      const best = Object.entries(freqs).sort((a,b) => b[1]-a[1])[0][0];
+      dna += best;
+    } else {
+      // BFC: sample proportionally
+      dna += sampleCodon(freqs);
+    }
+  }
+  dna += 'TAA';
+  return dna;
+}
+
+// ── Metrics
+function calcGC(dna) {
+  let gc = 0;
+  for (const b of dna) if (b === 'G' || b === 'C') gc++;
+  return gc / dna.length * 100;
+}
+
+function calcCSI(dna) {
+  // Geometric mean of relative adaptiveness (CAI)
+  const logW = [];
+  for (let i = 0; i < dna.length - 3; i += 3) {
+    const codon = dna.slice(i, i+3);
+    // find aa
+    let aa = null;
+    for (const [a, cmap] of Object.entries(CODON_FREQ)) {
+      if (codon in cmap) { aa = a; break; }
+    }
+    if (!aa || aa === 'M') continue;
+    const freqs = CODON_FREQ[aa];
+    const maxFreq = Math.max(...Object.values(freqs));
+    const w = (freqs[codon] || 0.001) / maxFreq;
+    logW.push(Math.log(w));
+  }
+  if (!logW.length) return 0;
+  return Math.exp(logW.reduce((a,b) => a+b, 0) / logW.length);
+}
+
+// ── Run
+function runOptimization() {
+  clearError();
+  const raw = document.getElementById('seq-input').value;
+  const protein = cleanProtein(raw);
+  const err = validateProtein(protein);
+  if (err) { showError(err); return; }
+
+  const strategy = document.querySelector('input[name="strategy"]:checked').value;
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Optimizing…';
+
+  // run async to allow spinner to render
+  setTimeout(() => {
+    try {
+      const core = protein.replace(/[_*]$/, '');
+      const dna = optimize(core, strategy);
+      lastDNA = dna;
+      lastProtein = core;
+      showResults(dna, core, strategy);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg> Optimize';
+    }
+  }, 30);
+}
+
+function showResults(dna, protein, strategy) {
+  const gc = calcGC(dna);
+  const csi = calcCSI(dna);
+  const ntLen = dna.length;
+  const aaLen = protein.length;
+  const start = dna.slice(0, 3);
+  const stop  = dna.slice(-3);
+
+  // GC bar: 0=0%, 100%=70%. warn if >50%, bad if >60%
+  document.getElementById('m-gc').textContent = gc.toFixed(1) + '%';
+  const gcBarPct = Math.min(gc / 70 * 100, 100);
+  const gcBar = document.getElementById('m-gc-bar');
+  gcBar.style.width = gcBarPct + '%';
+  gcBar.className = 'metric-bar-fill' + (gc > 55 ? ' bad' : gc > 42 ? ' warn' : '');
+
+  // Length
+  document.getElementById('m-len').textContent = ntLen + ' nt';
+  document.getElementById('m-len-sub').textContent = aaLen + ' aa · ' + (ntLen/3|0) + ' codons';
+
+  // CSI
+  document.getElementById('m-csi').textContent = csi.toFixed(3);
+  document.getElementById('m-csi-bar').style.width = (csi * 100) + '%';
+
+  // Start/Stop
+  document.getElementById('m-startstop').textContent = start + ' / ' + stop;
+  const ok = (start === 'ATG' || start === 'GTG') && STOP_CODONS.includes(stop);
+  document.getElementById('m-startstop-sub').textContent = ok ? '✓ Valid start & stop' : '⚠ Check codons';
+  document.getElementById('m-startstop-sub').style.color = ok ? 'var(--green)' : 'var(--amber)';
+
+  // Colored DNA
+  const codons = [];
+  for (let i = 0; i < dna.length; i += 3) codons.push(dna.slice(i, i+3));
+  document.getElementById('dna-colored').innerHTML = codons
+    .map(c => `<span class="codon">${c}</span>`)
+    .join('');
+
+  document.getElementById('results').classList.add('visible');
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── Copy / Download
+function copyDNA() {
+  navigator.clipboard.writeText(lastDNA).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+function downloadFasta() {
+  if (!lastDNA) return;
+  const strategy = document.querySelector('input[name="strategy"]:checked').value;
+  const header = `>ChlamyDesign|${strategy}|${lastProtein.length}aa`;
+  const seq = lastDNA.match(/.{1,60}/g).join('\n');
+  const blob = new Blob([header + '\n' + seq + '\n'], {type:'text/plain'});
+  triggerDownload(blob, 'chlamydesign_optimized.fasta');
+}
+
+function downloadCSV() {
+  if (!lastDNA) return;
+  const strategy = document.querySelector('input[name="strategy"]:checked').value;
+  const gc = calcGC(lastDNA).toFixed(2);
+  const csi = calcCSI(lastDNA).toFixed(4);
+  const rows = [
+    'strategy,dna,protein,gc_percent,csi,length_nt,length_aa',
+    `${strategy},${lastDNA},${lastProtein}_,${gc},${csi},${lastDNA.length},${lastProtein.length}`
+  ];
+  const blob = new Blob([rows.join('\n') + '\n'], {type:'text/csv'});
+  triggerDownload(blob, 'chlamydesign_optimized.csv');
+}
+
+function triggerDownload(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Enter key shortcut
+document.getElementById('seq-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) runOptimization();
+});
+</script>
 </body>
 </html>
