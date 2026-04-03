@@ -12,43 +12,40 @@ import argparse
 from pathlib import Path
 
 import torch
-from CodonTransformer.CodonPrediction import predict_dna_sequence, load_tokenizer
-from transformers import BigBirdForMaskedLM
+from CodonTransformer.CodonPrediction import (
+    predict_dna_sequence,
+    load_model as ct_load_model,
+    load_tokenizer,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ORGANISM = "Chlamydomonas reinhardtii chloroplast"
 
 
-def load_model(model_path: str | None, device: torch.device) -> BigBirdForMaskedLM:
-    """モデルを読み込む。
+def load_model(model_path: str | None, device: torch.device):
+    """モデルを読み込む（CodonTransformer API使用）。
 
     Args:
-        model_path: .pt または HuggingFace リポジトリID。Noneでベースモデル。
+        model_path: .pt/.ckpt ファイルパス、HuggingFace リポジトリID、
+                    またはディレクトリ。Noneでベースモデル。
         device: 使用デバイス。
 
     Returns:
         読み込み済みモデル。
     """
-    if model_path is None:
-        print("ベースモデル (adibvafa/CodonTransformer) を使用")
-        model = BigBirdForMaskedLM.from_pretrained("adibvafa/CodonTransformer")
-    elif Path(model_path).exists():
-        print(f"ローカルモデルを読み込み中: {model_path}")
-        model = BigBirdForMaskedLM.from_pretrained(model_path)
-    else:
-        print(f"HuggingFace Hub からモデルを読み込み中: {model_path}")
-        model = BigBirdForMaskedLM.from_pretrained(model_path)
-
-    model.to(device)
-    model.eval()
+    source = model_path or "adibvafa/CodonTransformer"
+    print(f"モデル読み込み: {source}")
+    model = ct_load_model(model_path=source, device=device)
     return model
 
 
 def predict(
     protein: str,
-    model: BigBirdForMaskedLM,
+    model,
     tokenizer,
     device: torch.device,
+    num_sequences: int = 1,
+    temperature: float = 0.2,
 ) -> dict[str, str | float]:
     """タンパク質からDNA配列を予測する。
 
@@ -57,6 +54,8 @@ def predict(
         model: 推論用モデル。
         tokenizer: トークナイザー。
         device: 使用デバイス。
+        num_sequences: 生成候補数（>1で非決定論的生成、GC%が34%に最も近い配列を選択）。
+        temperature: 非決定論的生成時の温度パラメータ (0.2-0.8)。
 
     Returns:
         predicted_dna, gc_percent を含む辞書。
@@ -64,15 +63,34 @@ def predict(
     if not protein.endswith("_"):
         protein = protein.rstrip("*") + "_"
 
+    deterministic = num_sequences == 1
+
     result = predict_dna_sequence(
         protein=protein,
         organism=ORGANISM,
         device=device,
         model=model,
         tokenizer=tokenizer,
+        deterministic=deterministic,
+        temperature=temperature,
+        num_sequences=num_sequences,
+        match_protein=True,
     )
 
-    dna = result.predicted_dna
+    if num_sequences > 1:
+        # 複数候補からGC%が34%に最も近い配列を選択
+        TARGET_GC = 34.0
+        best = min(
+            result,
+            key=lambda r: abs(
+                sum(1 for b in r.predicted_dna if b in "GC")
+                / len(r.predicted_dna) * 100 - TARGET_GC
+            ),
+        )
+        dna = best.predicted_dna
+    else:
+        dna = result.predicted_dna
+
     gc = sum(1 for b in dna if b in "GC") / len(dna) * 100
 
     return {
@@ -95,6 +113,14 @@ def main() -> None:
         "--model", default=None,
         help="モデルパス (.pt / HuggingFace ID / ディレクトリ)。省略でベースモデル"
     )
+    parser.add_argument(
+        "--num-sequences", type=int, default=1,
+        help="生成候補数 (>1で非決定論的生成、GC%%が34%%に最も近い配列を選択)"
+    )
+    parser.add_argument(
+        "--temperature", type=float, default=0.2,
+        help="非決定論的生成時の温度 (0.2-0.8)"
+    )
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -103,7 +129,11 @@ def main() -> None:
     model = load_model(args.model, device)
     tokenizer = load_tokenizer()
 
-    result = predict(args.protein, model, tokenizer, device)
+    result = predict(
+        args.protein, model, tokenizer, device,
+        num_sequences=args.num_sequences,
+        temperature=args.temperature,
+    )
 
     print(f"\n予測DNA ({result['length_nt']} nt):")
     print(result["predicted_dna"])

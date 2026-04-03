@@ -1,0 +1,18 @@
+# FastAPI backend dependencies
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+
+# CodonTransformer & ML
+torch>=2.0.0
+transformers>=4.30.0
+CodonTransformer>=1.0.0
+
+# Data
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Bioinformatics
+biopython>=1.81
+
+# ViennaRNA (optional, for MFE calculation)
+# Install separately: pip install ViennaRNA

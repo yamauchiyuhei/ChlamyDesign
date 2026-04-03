@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import random
 import re
-from collections import defaultdict
 from pathlib import Path
 
 import RNA
@@ -37,9 +36,15 @@ from CodonTransformer.CodonEvaluation import (
     get_CSI_value,
     get_GC_content,
     get_min_max_percentage,
+    get_sequence_complexity,
 )
-from CodonTransformer.CodonPrediction import load_tokenizer, predict_dna_sequence
-from transformers import BigBirdForMaskedLM
+from CodonTransformer.CodonPrediction import (
+    get_high_frequency_choice_sequence,
+    get_background_frequency_choice_sequence,
+    load_model as ct_load_model,
+    load_tokenizer,
+    predict_dna_sequence,
+)
 
 # --- Constants ---
 
@@ -58,26 +63,6 @@ CIS_ELEMENT_PATTERNS = {
     "palindrome": None,                     # パリンドロームは別途計算
 }
 
-# コドン→アミノ酸変換表（終止コドン除く）
-CODON_TABLE: dict[str, str] = {
-    "TTT": "F", "TTC": "F", "TTA": "L", "TTG": "L",
-    "CTT": "L", "CTC": "L", "CTA": "L", "CTG": "L",
-    "ATT": "I", "ATC": "I", "ATA": "I", "ATG": "M",
-    "GTT": "V", "GTC": "V", "GTA": "V", "GTG": "V",
-    "TCT": "S", "TCC": "S", "TCA": "S", "TCG": "S",
-    "CCT": "P", "CCC": "P", "CCA": "P", "CCG": "P",
-    "ACT": "T", "ACC": "T", "ACA": "T", "ACG": "T",
-    "GCT": "A", "GCC": "A", "GCA": "A", "GCG": "A",
-    "TAT": "Y", "TAC": "Y", "CAT": "H", "CAC": "H",
-    "CAA": "Q", "CAG": "Q", "AAT": "N", "AAC": "N",
-    "AAA": "K", "AAG": "K", "GAT": "D", "GAC": "D",
-    "GAA": "E", "GAG": "E", "TGT": "C", "TGC": "C",
-    "TGG": "W", "CGT": "R", "CGC": "R", "CGA": "R",
-    "CGG": "R", "AGT": "S", "AGC": "S", "AGA": "R",
-    "AGG": "R", "GGT": "G", "GGC": "G", "GGA": "G",
-    "GGG": "G",
-}
-
 random.seed(42)
 
 
@@ -85,99 +70,35 @@ random.seed(42)
 # コドン最適化戦略
 # ---------------------------------------------------------------------------
 
-def build_codon_tables(
-    cr_df: pd.DataFrame,
-) -> tuple[dict[str, str], dict[str, list[tuple[str, float]]]]:
-    """C. reinhardtii配列からCAI-maxとBFC用のコドン表を構築。
-
-    Args:
-        cr_df: C. reinhardtii のCDS DataFrame。
-
-    Returns:
-        cai_max_table: {aa: best_codon}
-        bfc_table:     {aa: [(codon, prob), ...]} （頻度比例サンプリング用）
-    """
-    aa_codon_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
-
-    for dna in cr_df["dna"]:
-        dna = dna.upper()
-        for i in range(0, len(dna) - 3, 3):
-            codon = dna[i:i+3]
-            aa = CODON_TABLE.get(codon)
-            if aa:
-                aa_codon_counts[aa][codon] += 1
-
-    cai_max_table: dict[str, str] = {}
-    bfc_table: dict[str, list[tuple[str, float]]] = {}
-
-    for aa, counts in aa_codon_counts.items():
-        total = sum(counts.values())
-        # CAI-max: 最頻コドンを選択
-        cai_max_table[aa] = max(counts, key=counts.get)
-        # BFC: 頻度比例でランダム選択
-        bfc_table[aa] = [(c, n / total) for c, n in counts.items()]
-
-    return cai_max_table, bfc_table
-
-
-def optimize_cai_max(protein: str, cai_max_table: dict[str, str]) -> str:
-    """CAI-max: 各アミノ酸に最頻コドンを割り当て。
+def optimize_cai_max(protein: str, codon_freqs: dict) -> str:
+    """CAI-max: CT の High Frequency Choice で最頻コドンを割り当て。
 
     Args:
         protein: タンパク質配列（末尾 _ 付き）。
-        cai_max_table: {aa: best_codon}。
+        codon_freqs: get_codon_frequencies() の出力。
 
     Returns:
         最適化DNA配列。
     """
-    dna = ""
-    for aa in protein.rstrip("_"):
-        if aa == "*":
-            break
-        codon = cai_max_table.get(aa)
-        if codon is None:
-            codon = "NNN"
-        dna += codon
-    dna += "TAA"  # 終止コドン
-    return dna
+    return get_high_frequency_choice_sequence(protein, codon_freqs)
 
 
-def optimize_bfc(protein: str, bfc_table: dict[str, list[tuple[str, float]]]) -> str:
-    """BFC: 各アミノ酸をコドン頻度に比例してランダム選択。
+def optimize_bfc(protein: str, codon_freqs: dict) -> str:
+    """BFC: CT の Background Frequency Choice でコドン頻度比例サンプリング。
 
     Args:
         protein: タンパク質配列（末尾 _ 付き）。
-        bfc_table: {aa: [(codon, prob), ...]}。
+        codon_freqs: get_codon_frequencies() の出力。
 
     Returns:
         最適化DNA配列。
     """
-    dna = ""
-    for aa in protein.rstrip("_"):
-        if aa == "*":
-            break
-        options = bfc_table.get(aa)
-        if options is None:
-            dna += "NNN"
-            continue
-        codons, probs = zip(*options)
-        # 頻度に比例したランダムサンプリング
-        r = random.random()
-        cumulative = 0.0
-        chosen = codons[-1]
-        for codon, prob in zip(codons, probs):
-            cumulative += prob
-            if r <= cumulative:
-                chosen = codon
-                break
-        dna += chosen
-    dna += "TAA"
-    return dna
+    return get_background_frequency_choice_sequence(protein, codon_freqs)
 
 
 def predict_ct(
     protein: str,
-    model: BigBirdForMaskedLM,
+    model,
     tokenizer,
     device: torch.device,
 ) -> str:
@@ -192,12 +113,14 @@ def predict_ct(
     Returns:
         予測DNA配列。
     """
+    # 評価時は再現性のため deterministic=True（デフォルト）
     result = predict_dna_sequence(
         protein=protein,
         organism=ORGANISM,
         device=device,
         model=model,
         tokenizer=tokenizer,
+        match_protein=True,
     )
     return result.predicted_dna
 
@@ -277,13 +200,19 @@ def calc_metrics(
     cis = count_cis_elements(dna)
     mfe = calc_mfe(dna)
 
+    try:
+        complexity = get_sequence_complexity(dna)
+    except Exception:
+        complexity = 0.0
+
     return {
-        "gc_percent": round(gc, 2),  # get_GC_contentはすでに%値を返す
+        "gc_percent": round(gc, 2),
         "csi": round(csi, 4),
         "cfd": round(cfd, 4),
         "minmax_mean": round(minmax_mean, 4),
         "cis_elements": cis,
         "mfe": mfe,
+        "complexity": round(complexity, 4),
     }
 
 
@@ -291,13 +220,11 @@ def calc_metrics(
 # モデル読み込み
 # ---------------------------------------------------------------------------
 
-def load_ct_model(
-    model_path: str | None, device: torch.device
-) -> BigBirdForMaskedLM:
-    """CodonTransformerモデルを読み込む。
+def load_ct_model(model_path: str | None, device: torch.device):
+    """CodonTransformerモデルを読み込む（CT API使用）。
 
     Args:
-        model_path: ローカルパスまたはHuggingFace ID。Noneでベースモデル。
+        model_path: ローカルパス (.pt/.ckpt)、HuggingFace ID。Noneでベースモデル。
         device: 使用デバイス。
 
     Returns:
@@ -305,10 +232,7 @@ def load_ct_model(
     """
     source = model_path or "adibvafa/CodonTransformer"
     print(f"  モデル読み込み: {source}")
-    model = BigBirdForMaskedLM.from_pretrained(source)
-    model.to(device)
-    model.eval()
-    return model
+    return ct_load_model(model_path=source, device=device)
 
 
 # ---------------------------------------------------------------------------
@@ -344,11 +268,8 @@ def main() -> None:
         cr_df = cr_df[cr_df["gene"].isin(args.genes)]
         print(f"  フィルタ後: {len(cr_df)} 遺伝子")
 
-    # --- コドン表構築 ---
+    # --- コドン頻度表構築 (CodonTransformer API) ---
     print("\n[2] コドン頻度表を構築中...")
-    cai_max_table, bfc_table = build_codon_tables(cr_df)
-
-    # CSI重みとコドン頻度 (CodonTransformer API使用)
     # GTG開始コドンはget_codon_frequenciesが非対応のためATG開始配列のみ使用
     atg_mask = cr_df["dna"].str.startswith("ATG")
     atg_df = cr_df[atg_mask]
@@ -357,7 +278,7 @@ def main() -> None:
         atg_df["dna"].tolist(),
         atg_df["protein"].tolist(),
     )
-    print(f"  コドン表完成: {len(cai_max_table)} アミノ酸")
+    print(f"  コドン頻度表完成: {len(codon_freqs)} アミノ酸")
 
     # --- モデル読み込み ---
     print("\n[3] モデルを読み込み中...")
@@ -399,8 +320,8 @@ def main() -> None:
         dna_seqs: dict[str, str] = {
             "natural": natural,
             "base_ct": predict_ct(protein, base_model, tokenizer, device) if not ct_skip else natural,
-            "cai_max": optimize_cai_max(protein, cai_max_table),
-            "bfc":     optimize_bfc(protein, bfc_table),
+            "cai_max": optimize_cai_max(protein, codon_freqs),
+            "bfc":     optimize_bfc(protein, codon_freqs),
         }
         if chlamyct_model is not None:
             dna_seqs["chlamyct"] = (
@@ -433,7 +354,7 @@ def main() -> None:
     print("戦略別メトリクス (平均値)")
     print("=" * 60)
     summary = results_df.groupby("strategy")[
-        ["gc_percent", "csi", "cfd", "minmax_mean", "cis_elements", "mfe"]
+        ["gc_percent", "csi", "cfd", "minmax_mean", "cis_elements", "mfe", "complexity"]
     ].mean().round(3)
     print(summary.to_string())
 
@@ -456,9 +377,10 @@ def _plot_results(df: pd.DataFrame) -> None:
         ("minmax_mean",  "%MinMax (平均)", None,     None),
         ("cis_elements", "Cis-elements数", [0],      None),
         ("mfe",          "MFE (kcal/mol)", None,     None),
+        ("complexity",   "Sequence Complexity", None, None),
     ]
 
-    fig, axes = plt.subplots(2, 3, figsize=(16, 10))
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
     fig.suptitle("コドン最適化戦略比較: C. reinhardtii葉緑体遺伝子", fontsize=14)
 
     palette = {
@@ -471,6 +393,10 @@ def _plot_results(df: pd.DataFrame) -> None:
     # 存在する戦略のみ
     present = df["strategy"].unique().tolist()
     pal = {k: v for k, v in palette.items() if k in present}
+
+    # 余ったサブプロットを非表示にする
+    for ax in axes.flat[len(metrics):]:
+        ax.set_visible(False)
 
     for ax, (col, ylabel, hlines, note) in zip(axes.flat, metrics):
         sns.boxplot(

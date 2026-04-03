@@ -115,6 +115,21 @@ textarea.error { border-color: var(--red); background: var(--red-lt); }
   background: var(--green-md); color: var(--green); border-radius: 4px;
   margin-left: 2px;
 }
+.strategy-tag.api-tag { background: #dbeafe; color: #1d4ed8; }
+
+/* ── Slider panel ── */
+.slider-panel {
+  display: none; margin-top: 14px; padding: 14px 16px;
+  background: #fafaf9; border: 1px solid var(--border); border-radius: 8px;
+}
+.slider-panel.visible { display: block; }
+.slider-row {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
+}
+.slider-row:last-child { margin-bottom: 0; }
+.slider-label { font-size: .8rem; font-weight: 500; min-width: 100px; }
+.slider-row input[type="range"] { flex: 1; accent-color: var(--green); }
+.slider-val { font-size: .8rem; font-weight: 600; min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ── Button ── */
 .btn-run {
@@ -136,6 +151,18 @@ textarea.error { border-color: var(--red); background: var(--red-lt); }
   display: none; align-items: center; gap: 6px;
 }
 .err-msg.visible { display: flex; }
+
+/* ── API status ── */
+.api-status {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .75rem; color: var(--muted); margin-left: 12px;
+}
+.api-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #d1d5db;
+}
+.api-dot.online { background: #22c55e; }
+.api-dot.offline { background: #ef4444; }
 
 /* ── Results ── */
 #results { display: none; }
@@ -222,7 +249,10 @@ footer a { color: var(--green); text-decoration: none; }
 
 <header>
   <div class="logo">ChlamyDesign <span>Chloroplast Gene Optimizer</span></div>
-  <span class="badge-header">Beta</span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="api-status" id="api-status"><span class="api-dot" id="api-dot"></span> <span id="api-label">Checking API...</span></span>
+    <span class="badge-header">Beta</span>
+  </div>
 </header>
 
 <main>
@@ -264,14 +294,38 @@ footer a { color: var(--green); text-decoration: none; }
         <input type="radio" name="strategy" value="bfc">
         <span class="dot"></span> BFC <span class="strategy-tag">stochastic</span>
       </label>
-      <label class="strategy-pill disabled" title="Available after model training">
-        <input type="radio" name="strategy" value="chlamyct" disabled>
-        <span class="dot"></span> ChlamyCT <span class="strategy-tag">soon</span>
+      <label class="strategy-pill" id="pill-basect">
+        <input type="radio" name="strategy" value="base_ct">
+        <span class="dot"></span> Base CT <span class="strategy-tag api-tag">API</span>
+      </label>
+      <label class="strategy-pill" id="pill-chlamyct">
+        <input type="radio" name="strategy" value="chlamyct">
+        <span class="dot"></span> ChlamyCT <span class="strategy-tag api-tag">API</span>
       </label>
     </div>
+
+    <!-- Slider panel for CT strategies -->
+    <div class="slider-panel" id="slider-panel">
+      <div class="slider-row">
+        <span class="slider-label">Candidates</span>
+        <input type="range" id="slider-seqs" min="1" max="20" value="1" step="1">
+        <span class="slider-val" id="val-seqs">1</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Temperature</span>
+        <input type="range" id="slider-temp" min="0.1" max="1.0" value="0.2" step="0.1">
+        <span class="slider-val" id="val-temp">0.2</span>
+      </div>
+      <p style="font-size:.73rem;color:var(--muted);margin-top:6px">
+        More candidates + higher temperature = more diverse options. Best GC% (~34%) is auto-selected.
+      </p>
+    </div>
+
     <p style="font-size:.8rem;color:var(--muted);margin-top:10px">
       <strong>CAI-max</strong>: always selects the most frequent codon per amino acid (~29% GC, maximum CSI).<br>
-      <strong>BFC</strong>: samples codons proportionally to their frequency, matching natural GC% (~33%).
+      <strong>BFC</strong>: samples codons proportionally to their frequency, matching natural GC% (~33%).<br>
+      <strong>Base CT</strong>: CodonTransformer model (164 organisms) with match_protein guarantee.<br>
+      <strong>ChlamyCT</strong>: fine-tuned for chloroplast expression (requires API).
     </p>
   </div>
 
@@ -288,25 +342,54 @@ footer a { color: var(--green); text-decoration: none; }
       <div class="metrics-grid">
         <div class="metric-box">
           <div class="metric-label">GC Content</div>
-          <div class="metric-value" id="m-gc">—</div>
+          <div class="metric-value" id="m-gc">--</div>
           <div class="metric-bar"><div class="metric-bar-fill" id="m-gc-bar" style="width:0%"></div></div>
           <div class="gc-target-note"><span class="gc-dot"></span> Target: ~34%</div>
         </div>
         <div class="metric-box">
           <div class="metric-label">Length</div>
-          <div class="metric-value" id="m-len">—</div>
+          <div class="metric-value" id="m-len">--</div>
           <div class="metric-sub" id="m-len-sub"></div>
         </div>
         <div class="metric-box">
           <div class="metric-label">CSI Score</div>
-          <div class="metric-value" id="m-csi">—</div>
+          <div class="metric-value" id="m-csi">--</div>
           <div class="metric-bar"><div class="metric-bar-fill" id="m-csi-bar" style="width:0%"></div></div>
-          <div class="metric-sub">Codon–chloroplast adaptation</div>
+          <div class="metric-sub">Codon-chloroplast adaptation</div>
         </div>
         <div class="metric-box">
           <div class="metric-label">Start / Stop</div>
-          <div class="metric-value" style="font-size:1.1rem" id="m-startstop">—</div>
+          <div class="metric-value" style="font-size:1.1rem" id="m-startstop">--</div>
           <div class="metric-sub" id="m-startstop-sub"></div>
+        </div>
+        <!-- Extended metrics (populated by API) -->
+        <div class="metric-box" id="box-cfd" style="display:none">
+          <div class="metric-label">CFD</div>
+          <div class="metric-value" id="m-cfd">--</div>
+          <div class="metric-bar"><div class="metric-bar-fill" id="m-cfd-bar" style="width:0%"></div></div>
+          <div class="metric-sub">Codon Frequency Distance</div>
+        </div>
+        <div class="metric-box" id="box-minmax" style="display:none">
+          <div class="metric-label">%MinMax</div>
+          <div class="metric-value" id="m-minmax">--</div>
+          <div class="metric-bar"><div class="metric-bar-fill" id="m-minmax-bar" style="width:0%"></div></div>
+          <div class="metric-sub">Sliding window (18 nt)</div>
+        </div>
+        <div class="metric-box" id="box-cis" style="display:none">
+          <div class="metric-label">Cis-elements</div>
+          <div class="metric-value" id="m-cis">--</div>
+          <div class="metric-sub">SD-like, TATA, polyA</div>
+        </div>
+        <div class="metric-box" id="box-mfe" style="display:none">
+          <div class="metric-label">MFE</div>
+          <div class="metric-value" id="m-mfe">--</div>
+          <div class="metric-sub">kcal/mol (RNA stability)</div>
+        </div>
+        <div class="metric-box" id="box-complexity" style="display:none">
+          <div class="metric-label">Complexity</div>
+          <div class="metric-value" id="m-complexity">--</div>
+          <div class="metric-bar"><div class="metric-bar-fill" id="m-complexity-bar" style="width:0%"></div></div>
+          <div class="metric-sub">Sequence complexity</div>
         </div>
       </div>
     </div>
@@ -337,7 +420,7 @@ footer a { color: var(--green); text-decoration: none; }
       <div class="info-item"><dt>Organism</dt><dd><em>Chlamydomonas reinhardtii</em> chloroplast</dd></div>
       <div class="info-item"><dt>Codon table</dt><dd>Plastid code (Table 11) · 69 reference genes</dd></div>
       <div class="info-item"><dt>Target GC%</dt><dd>~34% (vs nuclear ~64%)</dd></div>
-      <div class="info-item"><dt>Model</dt><dd>ChlamyCodonTransformer (fine-tuning in progress)</dd></div>
+      <div class="info-item"><dt>Model</dt><dd>CodonTransformer (base) + ChlamyCT (fine-tuned)</dd></div>
       <div class="info-item"><dt>Institution</dt><dd>Waseda University — Nishimura Lab</dd></div>
       <div class="info-item"><dt>Reference genome</dt><dd>GenBank BK000554</dd></div>
     </dl>
@@ -350,9 +433,7 @@ footer a { color: var(--green); text-decoration: none; }
 </footer>
 
 <script>
-// ── C. reinhardtii chloroplast codon frequency table
-// Derived from BK000554 (69 protein-coding genes, ~34% GC)
-// Format: AA -> { codon: relative_frequency (0-1) }
+// ── C. reinhardtii chloroplast codon frequency table (client-side fallback)
 const CODON_FREQ = {
   A: { GCT:0.42, GCA:0.30, GCC:0.17, GCG:0.11 },
   R: { AGA:0.40, AGG:0.20, CGT:0.18, CGA:0.12, CGC:0.06, CGG:0.04 },
@@ -378,9 +459,51 @@ const CODON_FREQ = {
 
 const STOP_CODONS = ['TAA','TAG','TGA'];
 const VALID_AA = new Set('ACDEFGHIKLMNPQRSTVWY');
+const CT_STRATEGIES = ['base_ct', 'chlamyct'];
 
 let lastDNA = '';
 let lastProtein = '';
+let apiAvailable = false;
+
+// ── API health check
+async function checkAPIHealth() {
+  const dot = document.getElementById('api-dot');
+  const label = document.getElementById('api-label');
+  try {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 5000);
+    const resp = await fetch('/api/health', { signal: ctrl.signal });
+    if (resp.ok) {
+      apiAvailable = true;
+      dot.classList.add('online');
+      label.textContent = 'API online';
+      enableCTPills();
+      return;
+    }
+  } catch (e) { /* offline */ }
+  apiAvailable = false;
+  dot.classList.add('offline');
+  label.textContent = 'API offline';
+  disableCTPills();
+}
+
+function enableCTPills() {
+  document.getElementById('pill-basect').classList.remove('disabled');
+  document.getElementById('pill-basect').querySelector('input').disabled = false;
+  document.getElementById('pill-chlamyct').classList.remove('disabled');
+  document.getElementById('pill-chlamyct').querySelector('input').disabled = false;
+}
+
+function disableCTPills() {
+  document.getElementById('pill-basect').classList.add('disabled');
+  document.getElementById('pill-basect').querySelector('input').disabled = true;
+  document.getElementById('pill-chlamyct').classList.add('disabled');
+  document.getElementById('pill-chlamyct').querySelector('input').disabled = true;
+}
+
+// Start with CT pills disabled until API health check completes
+disableCTPills();
+checkAPIHealth();
 
 // ── Sequence length counter
 document.getElementById('seq-input').addEventListener('input', function() {
@@ -391,6 +514,22 @@ document.getElementById('seq-input').addEventListener('input', function() {
   if (document.getElementById('results').classList.contains('visible')) {
     document.getElementById('results').classList.remove('visible');
   }
+});
+
+// ── Strategy change: show/hide slider panel
+document.querySelectorAll('input[name="strategy"]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    const panel = document.getElementById('slider-panel');
+    panel.classList.toggle('visible', CT_STRATEGIES.includes(this.value));
+  });
+});
+
+// ── Slider value display
+document.getElementById('slider-seqs').addEventListener('input', function() {
+  document.getElementById('val-seqs').textContent = this.value;
+});
+document.getElementById('slider-temp').addEventListener('input', function() {
+  document.getElementById('val-temp').textContent = parseFloat(this.value).toFixed(1);
 });
 
 function cleanProtein(raw) {
@@ -418,7 +557,7 @@ function clearError() {
   document.getElementById('err-msg').classList.remove('visible');
 }
 
-// ── Optimization
+// ── Client-side optimization (fallback for cai_max and bfc)
 function sampleCodon(freqs) {
   const r = Math.random();
   let cum = 0;
@@ -430,18 +569,16 @@ function sampleCodon(freqs) {
   return entries[entries.length - 1][0];
 }
 
-function optimize(protein, strategy) {
+function optimizeLocal(protein, strategy) {
   let dna = '';
   for (const aa of protein) {
     if (aa === '_' || aa === '*') break;
     const freqs = CODON_FREQ[aa];
     if (!freqs) { dna += 'NNN'; continue; }
     if (strategy === 'cai_max') {
-      // pick the codon with highest frequency
       const best = Object.entries(freqs).sort((a,b) => b[1]-a[1])[0][0];
       dna += best;
     } else {
-      // BFC: sample proportionally
       dna += sampleCodon(freqs);
     }
   }
@@ -449,7 +586,7 @@ function optimize(protein, strategy) {
   return dna;
 }
 
-// ── Metrics
+// ── Client-side metrics
 function calcGC(dna) {
   let gc = 0;
   for (const b of dna) if (b === 'G' || b === 'C') gc++;
@@ -457,11 +594,9 @@ function calcGC(dna) {
 }
 
 function calcCSI(dna) {
-  // Geometric mean of relative adaptiveness (CAI)
   const logW = [];
   for (let i = 0; i < dna.length - 3; i += 3) {
     const codon = dna.slice(i, i+3);
-    // find aa
     let aa = null;
     for (const [a, cmap] of Object.entries(CODON_FREQ)) {
       if (codon in cmap) { aa = a; break; }
@@ -476,8 +611,27 @@ function calcCSI(dna) {
   return Math.exp(logW.reduce((a,b) => a+b, 0) / logW.length);
 }
 
-// ── Run
-function runOptimization() {
+// ── API helper
+async function callAPI(endpoint, body) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000);
+  const opts = {
+    method: body ? 'POST' : 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    signal: controller.signal,
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const resp = await fetch('/api/' + endpoint, opts);
+  clearTimeout(timeout);
+  if (!resp.ok) {
+    const detail = await resp.text();
+    throw new Error(detail);
+  }
+  return resp.json();
+}
+
+// ── Main optimization
+async function runOptimization() {
   clearError();
   const raw = document.getElementById('seq-input').value;
   const protein = cleanProtein(raw);
@@ -487,21 +641,64 @@ function runOptimization() {
   const strategy = document.querySelector('input[name="strategy"]:checked').value;
   const btn = document.getElementById('run-btn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Optimizing…';
 
-  // run async to allow spinner to render
-  setTimeout(() => {
+  const isCT = CT_STRATEGIES.includes(strategy);
+  const core = protein.replace(/[_*]$/, '');
+  const proteinWithStop = core + '_';
+
+  if (isCT) {
+    // API-based prediction
+    btn.innerHTML = '<span class="spinner"></span> Generating with AI model...';
+    const numSeqs = parseInt(document.getElementById('slider-seqs').value);
+    const temp = parseFloat(document.getElementById('slider-temp').value);
     try {
-      const core = protein.replace(/[_*]$/, '');
-      const dna = optimize(core, strategy);
-      lastDNA = dna;
+      const result = await callAPI('predict', {
+        protein: proteinWithStop,
+        strategy: strategy,
+        num_sequences: numSeqs,
+        temperature: temp,
+      });
+      lastDNA = result.predicted_dna;
       lastProtein = core;
-      showResults(dna, core, strategy);
+      showResults(lastDNA, core, strategy);
+      // Fetch extended metrics
+      fetchExtendedMetrics(lastDNA);
+    } catch (e) {
+      showError('API error: ' + (e.message || 'Unknown error'));
     } finally {
-      btn.disabled = false;
-      btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg> Optimize';
+      resetButton();
     }
-  }, 30);
+  } else {
+    // Client-side prediction
+    btn.innerHTML = '<span class="spinner"></span> Optimizing...';
+    setTimeout(() => {
+      try {
+        const dna = optimizeLocal(core, strategy);
+        lastDNA = dna;
+        lastProtein = core;
+        showResults(dna, core, strategy);
+        // Optionally fetch extended metrics from API
+        if (apiAvailable) fetchExtendedMetrics(dna);
+      } finally {
+        resetButton();
+      }
+    }, 30);
+  }
+}
+
+function resetButton() {
+  const btn = document.getElementById('run-btn');
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg> Optimize';
+}
+
+async function fetchExtendedMetrics(dna) {
+  try {
+    const result = await callAPI('evaluate', { dna_sequence: dna });
+    showExtendedMetrics(result);
+  } catch (e) {
+    // Silently fail — client-side metrics are already shown
+  }
 }
 
 function showResults(dna, protein, strategy) {
@@ -512,7 +709,7 @@ function showResults(dna, protein, strategy) {
   const start = dna.slice(0, 3);
   const stop  = dna.slice(-3);
 
-  // GC bar: 0=0%, 100%=70%. warn if >50%, bad if >60%
+  // GC bar
   document.getElementById('m-gc').textContent = gc.toFixed(1) + '%';
   const gcBarPct = Math.min(gc / 70 * 100, 100);
   const gcBar = document.getElementById('m-gc-bar');
@@ -530,8 +727,11 @@ function showResults(dna, protein, strategy) {
   // Start/Stop
   document.getElementById('m-startstop').textContent = start + ' / ' + stop;
   const ok = (start === 'ATG' || start === 'GTG') && STOP_CODONS.includes(stop);
-  document.getElementById('m-startstop-sub').textContent = ok ? '✓ Valid start & stop' : '⚠ Check codons';
+  document.getElementById('m-startstop-sub').textContent = ok ? 'Valid start & stop' : 'Check codons';
   document.getElementById('m-startstop-sub').style.color = ok ? 'var(--green)' : 'var(--amber)';
+
+  // Hide extended metrics until API responds
+  hideExtendedMetrics();
 
   // Colored DNA
   const codons = [];
@@ -542,6 +742,56 @@ function showResults(dna, protein, strategy) {
 
   document.getElementById('results').classList.add('visible');
   document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showExtendedMetrics(r) {
+  // Update CSI and GC from server (more accurate)
+  if (r.csi !== undefined) {
+    document.getElementById('m-csi').textContent = r.csi.toFixed(3);
+    document.getElementById('m-csi-bar').style.width = (r.csi * 100) + '%';
+  }
+  if (r.gc_percent !== undefined) {
+    document.getElementById('m-gc').textContent = r.gc_percent.toFixed(1) + '%';
+    const gcBarPct = Math.min(r.gc_percent / 70 * 100, 100);
+    const gcBar = document.getElementById('m-gc-bar');
+    gcBar.style.width = gcBarPct + '%';
+    gcBar.className = 'metric-bar-fill' + (r.gc_percent > 55 ? ' bad' : r.gc_percent > 42 ? ' warn' : '');
+  }
+
+  // CFD
+  showMetricBox('box-cfd');
+  document.getElementById('m-cfd').textContent = r.cfd.toFixed(3);
+  document.getElementById('m-cfd-bar').style.width = (r.cfd * 100) + '%';
+
+  // %MinMax
+  showMetricBox('box-minmax');
+  document.getElementById('m-minmax').textContent = r.minmax_mean.toFixed(1);
+  document.getElementById('m-minmax-bar').style.width = Math.min(r.minmax_mean, 100) + '%';
+
+  // Cis-elements
+  showMetricBox('box-cis');
+  const cisEl = document.getElementById('m-cis');
+  cisEl.textContent = r.cis_elements;
+  cisEl.style.color = r.cis_elements === 0 ? 'var(--green)' : r.cis_elements <= 2 ? 'var(--amber)' : 'var(--red)';
+
+  // MFE
+  showMetricBox('box-mfe');
+  document.getElementById('m-mfe').textContent = r.mfe !== null ? r.mfe.toFixed(1) : 'N/A';
+
+  // Complexity
+  showMetricBox('box-complexity');
+  document.getElementById('m-complexity').textContent = r.complexity.toFixed(3);
+  document.getElementById('m-complexity-bar').style.width = (r.complexity * 100) + '%';
+}
+
+function showMetricBox(id) {
+  document.getElementById(id).style.display = '';
+}
+
+function hideExtendedMetrics() {
+  ['box-cfd', 'box-minmax', 'box-cis', 'box-mfe', 'box-complexity'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
 }
 
 // ── Copy / Download

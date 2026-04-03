@@ -1,0 +1,17 @@
+.git
+.github
+.firebase
+.claude
+__pycache__
+*.pyc
+*.pyo
+notebooks/
+results/
+data/raw/
+models/
+docs/
+*.md
+*.ipynb
+.firebaserc
+firebase.json
+LICENSE

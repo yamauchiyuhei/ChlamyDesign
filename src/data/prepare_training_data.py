@@ -11,12 +11,11 @@ Usage:
 from __future__ import annotations
 
 import json
-import math
-from collections import defaultdict
 from pathlib import Path
 
 import pandas as pd
 from CodonTransformer.CodonData import prepare_training_data
+from CodonTransformer.CodonEvaluation import get_CSI_weights, get_CSI_value
 
 # --- Constants ---
 
@@ -34,26 +33,6 @@ TIER2_GENES = {
     "atpB", "atpE", "atpH", "atpI",
 }
 TIER_WEIGHTS = {1: 5, 2: 2, 3: 1}
-
-# 標準的なコドン→アミノ酸表（終止コドンを除く）
-CODON_TABLE: dict[str, str] = {
-    "TTT": "F", "TTC": "F", "TTA": "L", "TTG": "L",
-    "CTT": "L", "CTC": "L", "CTA": "L", "CTG": "L",
-    "ATT": "I", "ATC": "I", "ATA": "I", "ATG": "M",
-    "GTT": "V", "GTC": "V", "GTA": "V", "GTG": "V",
-    "TCT": "S", "TCC": "S", "TCA": "S", "TCG": "S",
-    "CCT": "P", "CCC": "P", "CCA": "P", "CCG": "P",
-    "ACT": "T", "ACC": "T", "ACA": "T", "ACG": "T",
-    "GCT": "A", "GCC": "A", "GCA": "A", "GCG": "A",
-    "TAT": "Y", "TAC": "Y", "CAT": "H", "CAC": "H",
-    "CAA": "Q", "CAG": "Q", "AAT": "N", "AAC": "N",
-    "AAA": "K", "AAG": "K", "GAT": "D", "GAC": "D",
-    "GAA": "E", "GAG": "E", "TGT": "C", "TGC": "C",
-    "TGG": "W", "CGT": "R", "CGC": "R", "CGA": "R",
-    "CGG": "R", "AGT": "S", "AGC": "S", "AGA": "R",
-    "AGG": "R", "GGT": "G", "GGC": "G", "GGA": "G",
-    "GGG": "G",
-}
 
 
 def validate_sequences(df: pd.DataFrame) -> pd.DataFrame:
@@ -80,71 +59,27 @@ def validate_sequences(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def compute_codon_reference_table(df: pd.DataFrame) -> dict[str, dict[str, float]]:
-    """C. reinhardtiiのCDSからコドン相対適応度（w値）を計算。
+def compute_csi_weights(df: pd.DataFrame) -> dict[str, float]:
+    """C. reinhardtiiのATG開始CDSからCSI重みを計算（CodonTransformer API使用）。
 
     Args:
-        df: 全CDS DataFrame（source_species カラム必須）。
+        df: 全CDS DataFrame（source_species, dna カラム必須）。
 
     Returns:
-        {アミノ酸: {コドン: w値}} の辞書。w値は最頻コドンを1.0とした相対値。
+        CSI重み辞書（get_CSI_value() に渡す用）。
     """
     cr_df = df[df["source_species"] == "Chlamydomonas reinhardtii"]
     if cr_df.empty:
-        print("  [警告] C. reinhardtii CDSが見つかりません。全種でコドン表を計算します。")
+        print("  [警告] C. reinhardtii CDSが見つかりません。全種で重みを計算します。")
         cr_df = df
 
-    # アミノ酸ごとのコドン頻度を集計
-    aa_codon_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    # GTG開始コドンはget_CSI_weightsが非対応のためATG開始配列のみ使用
+    atg_seqs = cr_df[cr_df["dna"].str.startswith("ATG")]["dna"].tolist()
+    if not atg_seqs:
+        print("  [警告] ATG開始配列がありません。全配列を使用します。")
+        atg_seqs = cr_df["dna"].tolist()
 
-    for dna in cr_df["dna"]:
-        dna = dna.upper()
-        # 終止コドンを除いてカウント
-        for i in range(0, len(dna) - 3, 3):
-            codon = dna[i:i+3]
-            aa = CODON_TABLE.get(codon)
-            if aa:
-                aa_codon_counts[aa][codon] += 1
-
-    # w値（相対適応度）を計算: 各アミノ酸の最頻コドンを1.0とする
-    ref_table: dict[str, dict[str, float]] = {}
-    for aa, codon_counts in aa_codon_counts.items():
-        max_count = max(codon_counts.values())
-        ref_table[aa] = {
-            codon: count / max_count
-            for codon, count in codon_counts.items()
-        }
-
-    return ref_table
-
-
-def calculate_csi(dna: str, ref_table: dict[str, dict[str, float]]) -> float:
-    """コドン適応指数（CSI/CAI）を計算。
-
-    CSI = exp(geometric mean of log(w values)) for non-Met, non-stop codons.
-
-    Args:
-        dna: DNA配列（終止コドン含む）。
-        ref_table: compute_codon_reference_table() の出力。
-
-    Returns:
-        CSI値 (0.0 〜 1.0)。計算不能な場合は 0.0。
-    """
-    log_w_values: list[float] = []
-
-    for i in range(0, len(dna) - 3, 3):
-        codon = dna[i:i+3].upper()
-        aa = CODON_TABLE.get(codon)
-        if aa is None or aa == "M":  # Met(開始コドン)とstopは除外
-            continue
-        w = ref_table.get(aa, {}).get(codon)
-        if w is None or w <= 0:
-            continue
-        log_w_values.append(math.log(w))
-
-    if not log_w_values:
-        return 0.0
-    return round(math.exp(sum(log_w_values) / len(log_w_values)), 4)
+    return get_CSI_weights(atg_seqs)
 
 
 def assign_expression_tier(gene: str) -> int:
@@ -209,12 +144,12 @@ def main() -> None:
     df = validate_sequences(df)
     print(f"  バリデーション通過: {len(df)} 行")
 
-    # Step 3: CSI計算
+    # Step 3: CSI計算 (CodonTransformer API使用)
     print("\n[3] CSI（コドン適応指数）を計算中...")
-    ref_table = compute_codon_reference_table(df)
-    print(f"  基準コドン表: {len(ref_table)} アミノ酸")
+    csi_weights = compute_csi_weights(df)
+    print(f"  CSI重み計算完了 (CodonTransformer API)")
 
-    df["csi"] = df["dna"].apply(lambda d: calculate_csi(d, ref_table))
+    df["csi"] = df["dna"].apply(lambda d: get_CSI_value(d, csi_weights))
 
     csi_stats = df["csi"].describe()
     print(f"  CSI統計: mean={csi_stats['mean']:.3f}, "
