@@ -33,9 +33,11 @@ def load_model(model_path: str | None, device: torch.device):
     Returns:
         読み込み済みモデル。
     """
-    source = model_path or "adibvafa/CodonTransformer"
-    print(f"モデル読み込み: {source}")
-    model = ct_load_model(model_path=source, device=device)
+    if model_path:
+        print(f"モデル読み込み: {model_path}")
+    else:
+        print("モデル読み込み: HuggingFace (adibvafa/CodonTransformer)")
+    model = ct_load_model(model_path=model_path, device=device)
     return model
 
 

@@ -75,9 +75,9 @@ class ModelManager:
         if self._base_model is None:
             with self._lock:
                 if self._base_model is None:
-                    print(f"[ModelManager] Loading base model: {BASE_MODEL_ID}")
+                    print(f"[ModelManager] Loading base model from HuggingFace...")
                     self._base_model = ct_load_model(
-                        model_path=BASE_MODEL_ID, device=self._device
+                        model_path=None, device=self._device
                     )
         return self._base_model
 
