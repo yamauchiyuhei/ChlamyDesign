@@ -10,6 +10,7 @@ CodonTransformer>=1.0.0
 # Data
 pandas>=2.0.0
 numpy>=1.24.0
+datasets>=2.14.0
 
 # Bioinformatics
 biopython>=1.81

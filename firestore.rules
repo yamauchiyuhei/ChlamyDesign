@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // history コレクション: 自分のデータのみ読み書き可能
+    match /history/{docId} {
+      allow read, delete: if request.auth != null
+                          && request.auth.uid == resource.data.uid;
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid;
+    }
+
+    // その他は拒否
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -14,6 +14,6 @@ router = APIRouter()
 async def evaluate_endpoint(req: EvaluateRequest) -> EvaluateResponse:
     """Compute evaluation metrics for a DNA sequence."""
     try:
-        return evaluate(req.dna_sequence)
+        return evaluate(req.dna_sequence, organism=req.organism)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Evaluation failed: {e}")

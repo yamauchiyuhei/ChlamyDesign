@@ -13,7 +13,7 @@ from CodonTransformer.CodonEvaluation import (
     get_sequence_complexity,
 )
 
-from src.api.config import MFE_MAX_NT
+from src.api.config import DEFAULT_ORGANISM, MFE_MAX_NT
 from src.api.schemas import EvaluateResponse
 from src.api.services.model_manager import manager
 
@@ -52,10 +52,21 @@ def _count_cis_elements(dna: str) -> int:
     return count
 
 
-def evaluate(dna: str) -> EvaluateResponse:
-    """Compute all evaluation metrics for a DNA sequence."""
-    csi_weights = manager.csi_weights
-    codon_freqs = manager.codon_freqs
+def evaluate(dna: str, organism: str = DEFAULT_ORGANISM) -> EvaluateResponse:
+    """Compute all evaluation metrics for a DNA sequence.
+
+    Uses the specified organism's codon frequencies for CSI, CFD, and %MinMax
+    calculations. Falls back to Chlamydomonas chloroplast if organism not specified.
+    """
+    # Get organism-specific frequencies
+    try:
+        codon_freqs = manager.get_organism_frequencies(organism)
+    except ValueError:
+        codon_freqs = manager.codon_freqs  # fallback to Chlamydomonas
+
+    # CSI weights are Chlamydomonas-specific; for other organisms
+    # we still compute CSI based on available data
+    csi_weights = manager.csi_weights if organism == DEFAULT_ORGANISM else {}
 
     gc = get_GC_content(dna)
 
@@ -69,14 +80,25 @@ def evaluate(dna: str) -> EvaluateResponse:
     cfd = 0.0
     if codon_freqs:
         try:
-            cfd = get_cfd(dna, codon_freqs)
+            # Convert to AMINO2CODON_TYPE format for get_cfd
+            amino2codon = {}
+            for aa, codons in codon_freqs.items():
+                codon_list = list(codons.keys())
+                freq_list = list(codons.values())
+                amino2codon[aa] = (codon_list, freq_list)
+            cfd = get_cfd(dna, amino2codon)
         except Exception:
             pass
 
     minmax_mean = 0.0
     if codon_freqs:
         try:
-            vals = get_min_max_percentage(dna, codon_freqs, window_size=18)
+            amino2codon = {}
+            for aa, codons in codon_freqs.items():
+                codon_list = list(codons.keys())
+                freq_list = list(codons.values())
+                amino2codon[aa] = (codon_list, freq_list)
+            vals = get_min_max_percentage(dna, amino2codon, window_size=18)
             minmax_mean = sum(vals) / len(vals) if vals else 0.0
         except Exception:
             pass

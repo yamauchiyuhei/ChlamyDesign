@@ -1,4 +1,4 @@
-"""ChlamyDesign FastAPI application."""
+"""CodonDesign FastAPI application."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.config import ALLOWED_ORIGINS
-from src.api.routers import evaluate, info, predict
+from src.api.routers import analysis, evaluate, info, predict
 from src.api.services.model_manager import manager
 
 
@@ -20,9 +20,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="ChlamyDesign API",
-    description="Codon optimization API for C. reinhardtii chloroplast",
-    version="1.0.0",
+    title="CodonDesign API",
+    description="Universal codon optimization and sequence analysis API",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -36,6 +36,7 @@ app.add_middleware(
 app.include_router(predict.router, prefix="/api")
 app.include_router(evaluate.router, prefix="/api")
 app.include_router(info.router, prefix="/api")
+app.include_router(analysis.router, prefix="/api")
 
 
 @app.get("/api/health")

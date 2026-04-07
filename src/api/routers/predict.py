@@ -17,6 +17,7 @@ async def predict_endpoint(req: PredictRequest) -> PredictResponse:
         return optimize(
             protein=req.protein,
             strategy=req.strategy,
+            organism=req.organism,
             num_sequences=req.num_sequences,
             temperature=req.temperature,
         )

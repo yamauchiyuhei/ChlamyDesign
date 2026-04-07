@@ -3,839 +3,2928 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ChlamyDesign — Chloroplast Gene Optimizer</title>
+<title>CodonDesign — Universal Codon Optimizer</title>
+<script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
+  import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, deleteDoc, doc, Timestamp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCFdAy64M61sjCbiSEa7Cg8Pwb-qReosm0",
+    authDomain: "chlamydesign.firebaseapp.com",
+    projectId: "chlamydesign",
+    storageBucket: "chlamydesign.firebasestorage.app",
+    messagingSenderId: "979664573891",
+    appId: "1:979664573891:web:2a5e54e8a716d14680d976"
+  };
+
+  const fbApp = initializeApp(firebaseConfig);
+  const fbAuth = getAuth(fbApp);
+  const fbDb = getFirestore(fbApp);
+  const googleProvider = new GoogleAuthProvider();
+
+  // Expose to global scope for inline handlers
+  window.fbAuth = fbAuth;
+  window.fbDb = fbDb;
+  window.googleProvider = googleProvider;
+  window.fbSignInWithPopup = signInWithPopup;
+  window.fbSignOut = signOut;
+  window.fbCollection = collection;
+  window.fbAddDoc = addDoc;
+  window.fbQuery = query;
+  window.fbWhere = where;
+  window.fbOrderBy = orderBy;
+  window.fbGetDocs = getDocs;
+  window.fbDeleteDoc = deleteDoc;
+  window.fbDoc = doc;
+  window.fbTimestamp = Timestamp;
+
+  onAuthStateChanged(fbAuth, (user) => {
+    window.currentUser = user;
+    window.updateAuthUI && window.updateAuthUI();
+    if (user) window.loadHistory && window.loadHistory();
+  });
+</script>
 <style>
-/* ── Reset & Base ── */
+/* ══════════════════════════════════════════════════════════════════
+   Reset & Design Tokens
+   ══════════════════════════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --green:    #0f6e56;
-  --green-lt: #e1f5ee;
-  --green-md: #c3ead9;
-  --amber:    #b45309;
+  --green:    #0d9373;
+  --green-dk: #0a7a60;
+  --green-lt: #e6f7f1;
+  --green-md: #b8e6d5;
+  --amber:    #d97706;
   --amber-lt: #fef3c7;
   --red:      #dc2626;
   --red-lt:   #fee2e2;
-  --bg:       #f7f6f3;
+  --blue:     #2563eb;
+  --blue-dk:  #1d4ed8;
+  --blue-lt:  #dbeafe;
+  --purple:   #7c3aed;
+  --purple-dk:#6d28d9;
+  --purple-lt:#ede9fe;
+  --bg:       #f8f9fa;
   --surface:  #ffffff;
-  --border:   #e2e1dc;
-  --muted:    #6b6b65;
-  --text:     #1a1a18;
-  --radius:   12px;
-  --shadow:   0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
+  --border:   #e5e7eb;
+  --border-lt:#f0f1f3;
+  --muted:    #6b7280;
+  --text:     #111827;
+  --text-secondary: #4b5563;
+  --radius:   14px;
+  --radius-sm:8px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.05);
+  --shadow:   0 1px 3px rgba(0,0,0,.06), 0 6px 20px rgba(0,0,0,.04);
+  --shadow-lg:0 4px 6px rgba(0,0,0,.07), 0 10px 40px rgba(0,0,0,.06);
+  --transition: .2s cubic-bezier(.4,0,.2,1);
 }
-html { font-size: 15px; }
+html { font-size: 15px; scroll-behavior: smooth; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  line-height: 1.6;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ── Layout ── */
+/* ── Header ── */
 header {
-  position: sticky; top: 0; z-index: 10;
-  background: rgba(247,246,243,.92);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--border);
-  padding: 0 24px;
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(255,255,255,.82);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 1px solid rgba(0,0,0,.06);
+  padding: 0 24px; height: 56px;
   display: flex; align-items: center; justify-content: space-between;
-  height: 52px;
 }
-.logo { font-weight: 700; font-size: 1.1rem; color: var(--green); letter-spacing: -.3px; }
-.logo span { color: var(--text); font-weight: 400; font-size: .8rem; margin-left: 8px; opacity: .6; }
+.logo {
+  font-weight: 800; font-size: 1.15rem; color: var(--green);
+  letter-spacing: -.4px; display: flex; align-items: center; gap: 8px;
+}
+.logo svg { flex-shrink: 0; }
+.logo span {
+  color: var(--text-secondary); font-weight: 400; font-size: .78rem;
+  opacity: .7; margin-left: 2px;
+}
+.header-right { display: flex; align-items: center; gap: 12px; }
 .badge-header {
-  font-size: 11px; font-weight: 600; padding: 3px 10px;
-  background: var(--green-lt); color: var(--green);
-  border-radius: 20px; letter-spacing: .2px;
+  font-size: 10px; font-weight: 700; padding: 3px 10px;
+  background: linear-gradient(135deg, var(--green-lt), var(--green-md));
+  color: var(--green); border-radius: 20px; letter-spacing: .4px;
+  text-transform: uppercase;
 }
 
-main { max-width: 880px; margin: 0 auto; padding: 40px 24px 80px; }
-
-h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -.4px; margin-bottom: 4px; }
-.subtitle { color: var(--muted); font-size: .9rem; margin-bottom: 32px; }
-.subtitle em { font-style: italic; }
-
-/* ── Cards ── */
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 24px;
-  margin-bottom: 20px;
+/* ── Language ── */
+.lang-toggle {
+  display: inline-flex; border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--border); font-size: .72rem; font-weight: 700;
 }
-.card-title {
-  font-size: .75rem; font-weight: 600; text-transform: uppercase;
-  letter-spacing: .8px; color: var(--muted); margin-bottom: 14px;
+.lang-btn {
+  padding: 4px 12px; cursor: pointer; border: none;
+  background: var(--surface); color: var(--muted);
+  transition: all var(--transition); letter-spacing: .3px;
 }
-
-/* ── Form ── */
-label { display: block; font-size: .875rem; font-weight: 500; margin-bottom: 6px; }
-textarea {
-  width: 100%; padding: 12px 14px;
-  border: 1px solid var(--border); border-radius: 8px;
-  font-family: "SF Mono", "Fira Code", Consolas, monospace;
-  font-size: .8rem; line-height: 1.7;
-  background: #fafaf9; color: var(--text);
-  resize: vertical; min-height: 120px;
-  transition: border-color .15s;
-  outline: none;
-}
-textarea:focus { border-color: var(--green); background: var(--surface); }
-textarea.error { border-color: var(--red); background: var(--red-lt); }
-.seq-hint {
-  font-size: .78rem; color: var(--muted); margin-top: 6px;
-  display: flex; justify-content: space-between;
-}
-.seq-len { font-variant-numeric: tabular-nums; }
-
-/* ── Strategy Pills ── */
-.strategy-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
-.strategy-pill {
-  display: flex; align-items: center; gap: 6px;
-  padding: 8px 16px; border-radius: 8px; cursor: pointer;
-  border: 1.5px solid var(--border); background: var(--surface);
-  font-size: .85rem; font-weight: 500;
-  transition: border-color .15s, background .15s;
-  user-select: none;
-}
-.strategy-pill input { display: none; }
-.strategy-pill:has(input:checked) {
-  border-color: var(--green); background: var(--green-lt); color: var(--green);
-}
-.strategy-pill .dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: currentColor; opacity: .5;
-}
-.strategy-pill:has(input:checked) .dot { opacity: 1; }
-.strategy-pill.disabled { opacity: .45; cursor: not-allowed; }
-.strategy-tag {
-  font-size: 10px; font-weight: 700; padding: 1px 5px;
-  background: var(--green-md); color: var(--green); border-radius: 4px;
-  margin-left: 2px;
-}
-.strategy-tag.api-tag { background: #dbeafe; color: #1d4ed8; }
-
-/* ── Slider panel ── */
-.slider-panel {
-  display: none; margin-top: 14px; padding: 14px 16px;
-  background: #fafaf9; border: 1px solid var(--border); border-radius: 8px;
-}
-.slider-panel.visible { display: block; }
-.slider-row {
-  display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
-}
-.slider-row:last-child { margin-bottom: 0; }
-.slider-label { font-size: .8rem; font-weight: 500; min-width: 100px; }
-.slider-row input[type="range"] { flex: 1; accent-color: var(--green); }
-.slider-val { font-size: .8rem; font-weight: 600; min-width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
-
-/* ── Button ── */
-.btn-run {
-  display: inline-flex; align-items: center; gap: 8px;
-  background: var(--green); color: #fff;
-  border: none; border-radius: 8px; cursor: pointer;
-  font-size: .9rem; font-weight: 600; padding: 11px 24px;
-  transition: background .15s, transform .1s;
-  letter-spacing: -.1px;
-}
-.btn-run:hover { background: #0b5c47; }
-.btn-run:active { transform: scale(.97); }
-.btn-run:disabled { opacity: .5; cursor: not-allowed; transform: none; }
-.btn-run svg { flex-shrink: 0; }
-
-/* ── Error msg ── */
-.err-msg {
-  color: var(--red); font-size: .82rem; margin-top: 8px;
-  display: none; align-items: center; gap: 6px;
-}
-.err-msg.visible { display: flex; }
+.lang-btn.active { background: var(--green); color: #fff; }
+.lang-btn:hover:not(.active) { background: var(--green-lt); color: var(--green); }
 
 /* ── API status ── */
 .api-status {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: .75rem; color: var(--muted); margin-left: 12px;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: .72rem; color: var(--muted); font-weight: 500;
 }
 .api-dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #d1d5db;
+  width: 7px; height: 7px; border-radius: 50%; background: #d1d5db;
+  transition: background var(--transition);
 }
-.api-dot.online { background: #22c55e; }
+.api-dot.online { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,.4); }
 .api-dot.offline { background: #ef4444; }
+
+/* ── Main ── */
+main { max-width: 900px; margin: 0 auto; padding: 0 20px 80px; }
+
+/* ── Tabs ── */
+.tab-bar {
+  display: flex; gap: 2px; padding: 16px 0 0;
+  position: sticky; top: 56px; z-index: 40;
+  background: var(--bg);
+  margin-bottom: 0;
+}
+.tab-btn {
+  flex: 1; padding: 14px 16px; cursor: pointer; border: none;
+  background: transparent; font-size: .82rem; font-weight: 600;
+  color: var(--muted); border-radius: 12px 12px 0 0;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: all var(--transition); position: relative;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: var(--text); background: rgba(0,0,0,.03); }
+.tab-btn.active {
+  color: var(--green); background: var(--surface);
+  box-shadow: 0 -2px 8px rgba(0,0,0,.04);
+}
+.tab-btn.active::after {
+  content: ''; position: absolute; bottom: 0; left: 20%; right: 20%;
+  height: 2.5px; background: var(--green); border-radius: 2px 2px 0 0;
+}
+.tab-btn .tab-icon { width: 18px; height: 18px; opacity: .6; flex-shrink: 0; }
+.tab-btn.active .tab-icon { opacity: 1; }
+
+.tab-content {
+  background: var(--surface); border-radius: 0 0 var(--radius) var(--radius);
+  box-shadow: var(--shadow); border: 1px solid var(--border-lt);
+  border-top: none;
+  padding: 28px 28px 32px;
+  min-height: 400px;
+}
+.tab-panel { display: none; animation: fadeIn .3s ease; }
+.tab-panel.active { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Section headers ── */
+.section-header {
+  margin-bottom: 20px;
+}
+.section-title {
+  font-size: 1.3rem; font-weight: 800; letter-spacing: -.5px;
+  color: var(--text); line-height: 1.3;
+}
+.section-subtitle {
+  color: var(--text-secondary); font-size: .85rem; margin-top: 6px; line-height: 1.5;
+}
+.section-subtitle a { color: var(--green); text-decoration: none; font-weight: 500; }
+.section-subtitle a:hover { text-decoration: underline; }
+
+/* ── Form group ── */
+.form-group { margin-bottom: 22px; }
+.form-group:last-child { margin-bottom: 0; }
+.form-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: .78rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--muted); margin-bottom: 10px;
+}
+.form-label svg { opacity: .5; }
+.form-divider {
+  height: 1px; background: var(--border); margin: 24px 0;
+}
+
+/* ── Inputs ── */
+textarea, .input-field {
+  width: 100%; padding: 12px 16px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-family: "SF Mono", "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: .8rem; line-height: 1.7;
+  background: var(--bg); color: var(--text);
+  resize: vertical; min-height: 100px;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  outline: none;
+}
+textarea:focus, .input-field:focus {
+  border-color: var(--green); background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(13,147,115,.1);
+}
+textarea.error {
+  border-color: var(--red); background: var(--red-lt);
+  box-shadow: 0 0 0 3px rgba(220,38,38,.08);
+}
+.seq-hint {
+  font-size: .75rem; color: var(--muted); margin-top: 8px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+/* ── Input type toggle ── */
+.input-type-toggle {
+  display: inline-flex; border: 1.5px solid var(--border); border-radius: 8px;
+  overflow: hidden; margin-left: auto;
+}
+.input-type-toggle label {
+  padding: 4px 14px; font-size: .72rem; font-weight: 600;
+  letter-spacing: .3px; cursor: pointer; color: var(--muted);
+  transition: background var(--transition), color var(--transition);
+  user-select: none; display: flex; align-items: center; gap: 4px;
+}
+.input-type-toggle label:not(:last-child) { border-right: 1.5px solid var(--border); }
+.input-type-toggle input { display: none; }
+.input-type-toggle label:has(input:checked) {
+  background: var(--green); color: #fff;
+}
+.input-type-toggle label:hover:not(:has(input:checked)) {
+  background: var(--green-lt);
+}
+.translated-preview {
+  margin-top: 8px; padding: 10px 14px;
+  background: var(--bg); border: 1px dashed var(--border); border-radius: var(--radius-sm);
+  font-size: .72rem; color: var(--muted); line-height: 1.6;
+  max-height: 60px; overflow-y: auto;
+  font-family: "SF Mono", "JetBrains Mono", monospace;
+  display: none;
+}
+.translated-preview.visible { display: block; }
+.translated-preview .label {
+  font-weight: 700; color: var(--green-dk); font-family: var(--font-base); font-size: .7rem;
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; display: block;
+}
+.seq-len {
+  font-variant-numeric: tabular-nums; font-weight: 600;
+  background: var(--bg); padding: 2px 8px; border-radius: 4px;
+  font-size: .72rem;
+}
+
+/* ── Organism selector ── */
+.organism-selector { position: relative; }
+.organism-search {
+  width: 100%; padding: 11px 16px; padding-right: 40px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: .85rem; background: var(--bg); color: var(--text);
+  outline: none; transition: all var(--transition);
+}
+.organism-search:focus {
+  border-color: var(--green); background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(13,147,115,.1);
+}
+.organism-search-icon {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); pointer-events: none; opacity: .5;
+}
+.organism-dropdown {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+  max-height: 280px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-lg);
+  z-index: 100;
+}
+.organism-dropdown.open { display: block; }
+.organism-group-label {
+  font-size: .65rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .8px; color: var(--muted); padding: 10px 16px 4px;
+  background: var(--bg); position: sticky; top: 0;
+}
+.organism-item {
+  padding: 9px 16px; cursor: pointer; font-size: .83rem;
+  transition: background .1s;
+}
+.organism-item:hover { background: var(--green-lt); }
+.organism-item.active { background: var(--green-lt); color: var(--green); font-weight: 600; }
+.organism-item em { font-style: italic; }
+.organism-selected-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 20px; font-size: .78rem; font-weight: 500;
+  background: var(--green-lt); color: var(--green);
+  margin-top: 8px; font-style: italic;
+}
+.organism-selected-badge svg { flex-shrink: 0; }
+
+/* ── Strategy Pills ── */
+.strategy-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.strategy-pill {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 18px; border-radius: 10px; cursor: pointer;
+  border: 1.5px solid var(--border); background: var(--surface);
+  font-size: .84rem; font-weight: 600;
+  transition: all var(--transition); user-select: none;
+}
+.strategy-pill input { display: none; }
+.strategy-pill:hover { border-color: var(--green-md); background: var(--green-lt); }
+.strategy-pill:has(input:checked) {
+  border-color: var(--green); background: var(--green-lt); color: var(--green);
+  box-shadow: 0 0 0 3px rgba(13,147,115,.08);
+}
+.strategy-pill .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  border: 2px solid var(--border); transition: all var(--transition);
+}
+.strategy-pill:has(input:checked) .dot {
+  background: var(--green); border-color: var(--green);
+  box-shadow: 0 0 0 2px var(--green-lt);
+}
+.strategy-pill.disabled { opacity: .4; cursor: not-allowed; pointer-events: none; }
+.strategy-pill.hidden { display: none; }
+.strategy-tag {
+  font-size: 9px; font-weight: 800; padding: 2px 6px;
+  border-radius: 4px; letter-spacing: .3px; text-transform: uppercase;
+}
+.strategy-tag.stoch-tag { background: var(--amber-lt); color: var(--amber); }
+.strategy-tag.api-tag { background: var(--blue-lt); color: var(--blue); }
+
+/* Strategy description (collapsible) */
+.strategy-detail {
+  margin-top: 12px; overflow: hidden;
+  max-height: 0; opacity: 0;
+  transition: max-height .3s ease, opacity .2s ease, margin .2s ease;
+}
+.strategy-detail.open { max-height: 200px; opacity: 1; }
+.strategy-detail-inner {
+  font-size: .78rem; color: var(--text-secondary); line-height: 1.6;
+  padding: 12px 14px; background: var(--bg); border-radius: var(--radius-sm);
+  border-left: 3px solid var(--green-md);
+}
+.strategy-toggle {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: .75rem; color: var(--muted); cursor: pointer;
+  margin-top: 10px; background: none; border: none; font-weight: 500;
+  transition: color var(--transition);
+}
+.strategy-toggle:hover { color: var(--green); }
+.strategy-toggle svg { transition: transform .2s; }
+.strategy-toggle.open svg { transform: rotate(180deg); }
+
+/* ── Slider panel ── */
+.slider-panel {
+  display: none; margin-top: 14px; padding: 16px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.slider-panel.visible { display: block; animation: fadeIn .2s ease; }
+.slider-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.slider-row:last-child { margin-bottom: 0; }
+.slider-label { font-size: .78rem; font-weight: 600; min-width: 90px; color: var(--text-secondary); }
+.slider-row input[type="range"] { flex: 1; accent-color: var(--green); height: 4px; }
+.slider-val {
+  font-size: .78rem; font-weight: 700; min-width: 36px;
+  text-align: center; font-variant-numeric: tabular-nums;
+  background: var(--surface); padding: 2px 8px; border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+/* ── Buttons ── */
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: linear-gradient(135deg, var(--green), var(--green-dk));
+  color: #fff; border: none; border-radius: 10px; cursor: pointer;
+  font-size: .88rem; font-weight: 700; padding: 12px 28px;
+  transition: all var(--transition); letter-spacing: -.1px;
+  box-shadow: 0 2px 8px rgba(13,147,115,.25);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(13,147,115,.3); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-primary svg { flex-shrink: 0; }
+.btn-primary.btn-blue {
+  background: linear-gradient(135deg, var(--blue), var(--blue-dk));
+  box-shadow: 0 2px 8px rgba(37,99,235,.25);
+}
+.btn-primary.btn-blue:hover { box-shadow: 0 4px 16px rgba(37,99,235,.3); }
+.btn-primary.btn-purple {
+  background: linear-gradient(135deg, var(--purple), var(--purple-dk));
+  box-shadow: 0 2px 8px rgba(124,58,237,.25);
+}
+.btn-primary.btn-purple:hover { box-shadow: 0 4px 16px rgba(124,58,237,.3); }
+
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: var(--radius-sm); font-size: .8rem; font-weight: 600;
+  cursor: pointer; border: 1.5px solid var(--border); background: var(--surface);
+  color: var(--text-secondary); transition: all var(--transition);
+}
+.btn-secondary:hover { border-color: var(--green); color: var(--green); background: var(--green-lt); }
+
+.btn-text {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 12px; border-radius: 6px; font-size: .78rem; font-weight: 600;
+  cursor: pointer; border: none; background: var(--bg);
+  color: var(--muted); transition: all var(--transition);
+}
+.btn-text:hover { color: var(--green); background: var(--green-lt); }
+
+/* ── Error msg ── */
+.err-msg {
+  color: var(--red); font-size: .8rem; margin-top: 10px;
+  display: none; align-items: center; gap: 6px;
+  padding: 8px 12px; background: var(--red-lt); border-radius: 6px;
+}
+.err-msg.visible { display: flex; }
 
 /* ── Results ── */
 #results { display: none; }
-#results.visible { display: block; }
-
+#results.visible { display: block; animation: fadeIn .4s ease; }
 .metrics-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 14px; margin-bottom: 20px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 12px; margin-bottom: 20px;
 }
 .metric-box {
-  background: #fafaf9; border: 1px solid var(--border); border-radius: 10px;
-  padding: 14px 16px;
+  background: var(--bg); border: 1px solid var(--border-lt); border-radius: 12px;
+  padding: 14px 16px; transition: border-color var(--transition);
 }
-.metric-label { font-size: .72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 4px; }
-.metric-value { font-size: 1.4rem; font-weight: 700; letter-spacing: -.5px; }
-.metric-sub { font-size: .75rem; color: var(--muted); margin-top: 2px; }
-.metric-bar { height: 4px; border-radius: 2px; background: var(--border); margin-top: 8px; overflow: hidden; }
-.metric-bar-fill { height: 100%; border-radius: 2px; background: var(--green); transition: width .6s cubic-bezier(.4,0,.2,1); }
+.metric-box:hover { border-color: var(--border); }
+.metric-label {
+  font-size: .68rem; color: var(--muted); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .6px; margin-bottom: 4px;
+}
+.metric-value { font-size: 1.35rem; font-weight: 800; letter-spacing: -.5px; color: var(--text); }
+.metric-sub { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+.metric-bar { height: 3px; border-radius: 2px; background: var(--border-lt); margin-top: 8px; overflow: hidden; }
+.metric-bar-fill {
+  height: 100%; border-radius: 2px; background: var(--green);
+  transition: width .8s cubic-bezier(.4,0,.2,1);
+}
 .metric-bar-fill.warn { background: var(--amber); }
 .metric-bar-fill.bad  { background: var(--red); }
+.gc-target-note {
+  font-size: .72rem; color: var(--muted); margin-top: 6px;
+  display: flex; align-items: center; gap: 5px;
+}
+.gc-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
 
+/* ── DNA display ── */
 .dna-wrap {
-  position: relative;
-  background: #fafaf9; border: 1px solid var(--border); border-radius: 8px;
-  padding: 16px; font-family: "SF Mono","Fira Code",Consolas,monospace;
-  font-size: .78rem; line-height: 1.8; color: #1a1a18;
-  word-break: break-all; max-height: 220px; overflow-y: auto;
+  position: relative; background: #1e293b; border-radius: var(--radius-sm);
+  padding: 18px; font-family: "SF Mono","JetBrains Mono",Consolas,monospace;
+  font-size: .76rem; line-height: 2; color: #e2e8f0;
+  word-break: break-all; max-height: 200px; overflow-y: auto;
 }
 .dna-wrap .codon { display: inline; }
-.dna-wrap .codon:nth-child(3n+1) { color: #0f6e56; }
-.dna-wrap .codon:nth-child(3n+2) { color: #1d4ed8; }
-.dna-wrap .codon:nth-child(3n)   { color: #7c3aed; }
-
+.dna-wrap .codon:nth-child(3n+1) { color: #34d399; }
+.dna-wrap .codon:nth-child(3n+2) { color: #60a5fa; }
+.dna-wrap .codon:nth-child(3n)   { color: #c084fc; }
 .copy-btn {
-  position: absolute; top: 10px; right: 10px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 6px; padding: 5px 10px; font-size: .75rem; font-weight: 500;
-  cursor: pointer; color: var(--muted); transition: color .15s, border-color .15s;
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15);
+  border-radius: 6px; padding: 5px 12px; font-size: .72rem; font-weight: 600;
+  cursor: pointer; color: #94a3b8; transition: all var(--transition);
+  backdrop-filter: blur(4px);
 }
-.copy-btn:hover { color: var(--green); border-color: var(--green); }
+.copy-btn:hover { color: #fff; background: rgba(255,255,255,.2); }
+.dl-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
 
-.dl-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
-.btn-dl {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 16px; border-radius: 7px; font-size: .83rem; font-weight: 500;
-  cursor: pointer; border: 1px solid var(--border); background: var(--surface);
-  color: var(--text); text-decoration: none;
-  transition: border-color .15s, color .15s;
-}
-.btn-dl:hover { border-color: var(--green); color: var(--green); }
-
-/* ── GC gauge ── */
-.gc-target-note {
-  font-size: .78rem; color: var(--muted); margin-top: 6px;
+/* ── Results card divider ── */
+.result-section { margin-top: 24px; }
+.result-section-title {
+  font-size: .72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--muted); margin-bottom: 12px;
   display: flex; align-items: center; gap: 6px;
 }
-.gc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
 
-/* ── Info section ── */
-.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 600px) { .info-grid { grid-template-columns: 1fr; } }
-.info-item { font-size: .85rem; }
-.info-item dt { font-weight: 600; color: var(--muted); font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 3px; }
-.info-item dd { color: var(--text); }
+/* ── Restriction enzyme table ── */
+.re-table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  font-size: .8rem; margin-top: 12px;
+}
+.re-table th {
+  text-align: left; padding: 10px 12px; font-weight: 700; font-size: .68rem;
+  text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
+  border-bottom: 2px solid var(--border); background: var(--bg);
+  position: sticky; top: 0;
+}
+.re-table td { padding: 10px 12px; border-bottom: 1px solid var(--border-lt); }
+.re-table tr:hover td { background: var(--green-lt); }
+.re-table tr:last-child td { border-bottom: none; }
+.re-badge {
+  display: inline-block; padding: 2px 10px; border-radius: 10px;
+  font-size: .72rem; font-weight: 700;
+}
+.re-badge.none { background: var(--green-lt); color: var(--green); }
+.re-badge.some { background: var(--amber-lt); color: var(--amber); }
+.re-badge.many { background: var(--red-lt); color: var(--red); }
+.re-summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.re-summary-item {
+  text-align: center; padding: 14px 24px;
+  background: var(--bg); border: 1px solid var(--border-lt); border-radius: 12px;
+  flex: 1; min-width: 100px;
+}
+.re-summary-value { font-size: 1.5rem; font-weight: 800; color: var(--text); }
+.re-summary-label { font-size: .68rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .3px; margin-top: 2px; }
+
+/* ── RNA structure ── */
+.rna-structure-display {
+  font-family: "SF Mono","JetBrains Mono",Consolas,monospace;
+  font-size: .68rem; line-height: 1.5;
+  background: #1e293b; color: #e2e8f0; border-radius: var(--radius-sm);
+  padding: 16px; overflow-x: auto; white-space: pre-wrap; word-break: break-all;
+  max-height: 280px; overflow-y: auto;
+}
+.rna-info-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 10px; margin-bottom: 14px;
+}
+.rna-info-box {
+  text-align: center; padding: 12px 8px;
+  background: var(--bg); border: 1px solid var(--border-lt); border-radius: 10px;
+}
+.rna-info-value { font-size: 1.15rem; font-weight: 800; color: var(--text); }
+.rna-info-label { font-size: .65rem; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+.rna-utr-input {
+  width: 100%; padding: 10px 14px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-family: "SF Mono","JetBrains Mono","Fira Code",Consolas,monospace;
+  font-size: .78rem; line-height: 1.5;
+  background: var(--bg); color: var(--text);
+  outline: none; transition: border-color var(--transition), box-shadow var(--transition);
+}
+.rna-utr-input:focus {
+  border-color: var(--purple); background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(124,58,237,.1);
+}
+.rna-utr-input::placeholder { color: var(--muted); opacity: .6; }
+.rna-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .68rem; font-weight: 700; padding: 3px 10px;
+  border-radius: 20px; letter-spacing: .3px;
+}
+.rna-badge.vienna { background: rgba(34,197,94,.12); color: #16a34a; }
+.rna-badge.nussinov { background: rgba(124,58,237,.12); color: #7c3aed; }
+.rna-toggle-group {
+  display: inline-flex; border: 1.5px solid var(--border); border-radius: 8px;
+  overflow: hidden; margin-left: 8px;
+}
+.rna-toggle-group button {
+  padding: 4px 14px; font-size: .72rem; font-weight: 600;
+  letter-spacing: .3px; cursor: pointer; color: var(--muted);
+  background: var(--surface); border: none;
+  transition: background var(--transition), color var(--transition);
+}
+.rna-toggle-group button:not(:last-child) { border-right: 1.5px solid var(--border); }
+.rna-toggle-group button.active { background: var(--purple); color: #fff; }
+.rna-toggle-group button:hover:not(.active) { background: var(--purple-lt); }
+.rna-2d-container {
+  width: 100%; height: 500px; background: #0f172a;
+  border-radius: var(--radius-sm); position: relative; overflow: hidden;
+  border: 1px solid rgba(255,255,255,.1); margin-top: 12px;
+}
+.rna-2d-container svg { width: 100%; height: 100%; }
+.rna-2d-controls {
+  position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; z-index: 10;
+}
+.rna-2d-controls button {
+  padding: 5px 10px; font-size: .7rem; font-weight: 600;
+  background: rgba(255,255,255,.12); color: #e2e8f0; border: 1px solid rgba(255,255,255,.15);
+  border-radius: 6px; cursor: pointer; transition: background var(--transition);
+}
+.rna-2d-controls button:hover { background: rgba(255,255,255,.22); }
+.rna-2d-controls button.active { background: var(--purple); border-color: var(--purple); color: #fff; }
+.rna-mountain-container {
+  width: 100%; height: 200px; background: var(--bg);
+  border: 1px solid var(--border-lt); border-radius: var(--radius-sm);
+  margin-top: 12px; overflow: hidden;
+  position: relative;
+}
+.rna-mountain-container svg { width: 100%; height: 100%; display: block; }
+.rna-chart-tooltip {
+  position: absolute; pointer-events: none;
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 9px; font-size: 11px; line-height: 1.5;
+  box-shadow: 0 4px 12px rgba(0,0,0,.35);
+  white-space: nowrap; z-index: 10;
+  opacity: 0; transition: opacity .08s linear;
+}
+.rna-chart-tooltip.visible { opacity: 1; }
+.rna-chart-tooltip .ttip-title { font-weight: 600; margin-bottom: 2px; }
+.rna-chart-tooltip .ttip-row { display: flex; align-items: center; gap: 6px; }
+.rna-chart-tooltip .ttip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.rna-legend {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  font-size: .68rem; color: var(--muted); margin-top: 8px;
+}
+.rna-legend-item {
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.rna-legend-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.rna-utr-hint {
+  font-size: .7rem; color: var(--muted); margin-top: 4px; line-height: 1.4;
+}
+.rna-tooltip {
+  position: relative; display: inline-flex; align-items: center;
+  margin-left: 4px; cursor: help;
+}
+.rna-tooltip .rna-tooltip-text {
+  visibility: hidden; opacity: 0;
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  width: 220px; padding: 8px 10px;
+  background: #1e293b; color: #e2e8f0; font-size: .7rem; line-height: 1.4;
+  border-radius: 6px; box-shadow: var(--shadow-lg);
+  transition: opacity .2s; z-index: 20; pointer-events: none;
+}
+.rna-tooltip:hover .rna-tooltip-text { visibility: visible; opacity: 1; }
+
+/* ── 3D viewer ── */
+#esm-viewer {
+  width: 100%; height: 420px;
+  border: 1px solid rgba(255,255,255,.1); border-radius: var(--radius-sm);
+  background: #0f172a; position: relative; overflow: hidden;
+}
+.viewer-controls {
+  display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; align-items: center;
+}
+.viewer-ctrl-btn {
+  padding: 6px 14px; border-radius: 6px; font-size: .75rem; font-weight: 600;
+  cursor: pointer; border: 1.5px solid var(--border); background: var(--surface);
+  color: var(--text-secondary); transition: all var(--transition);
+}
+.viewer-ctrl-btn:hover { border-color: var(--green); color: var(--green); }
+.viewer-ctrl-btn.active { background: var(--green-lt); border-color: var(--green); color: var(--green); }
+.esm-info { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.esm-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 14px; border-radius: 20px; font-size: .75rem; font-weight: 600;
+}
+
+/* ── BLAST results ── */
+.blast-hit {
+  border: 1px solid var(--border-lt); border-radius: 10px;
+  padding: 16px; margin-bottom: 10px; background: var(--surface);
+  transition: all var(--transition);
+}
+.blast-hit:hover { border-color: var(--green); box-shadow: 0 2px 12px rgba(13,147,115,.06); }
+.blast-hit-header { margin-bottom: 8px; }
+.blast-hit-name { font-weight: 700; font-size: .85rem; }
+.blast-hit-name a { color: var(--green); text-decoration: none; }
+.blast-hit-name a:hover { text-decoration: underline; }
+.blast-stats { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.blast-stat {
+  font-size: .72rem; padding: 3px 10px; border-radius: 6px;
+  background: var(--bg); border: 1px solid var(--border-lt);
+  font-weight: 500;
+}
+.blast-stat strong { font-weight: 700; }
+.blast-alignment {
+  font-family: "SF Mono","JetBrains Mono",Consolas,monospace;
+  font-size: .68rem; line-height: 1.5; white-space: pre;
+  overflow-x: auto; padding: 10px; background: #1e293b;
+  color: #e2e8f0; border-radius: 6px; margin-top: 10px;
+}
+.blast-progress { text-align: center; padding: 40px 20px; color: var(--muted); }
+.blast-progress .spinner-large {
+  width: 32px; height: 32px; border: 3px solid var(--border);
+  border-top-color: var(--green); border-radius: 50%;
+  animation: spin .7s linear infinite; margin: 0 auto 14px;
+}
+
+/* ── Tool section header ── */
+.tool-section {
+  padding: 20px 0; border-bottom: 1px solid var(--border-lt);
+}
+.tool-section:last-child { border-bottom: none; padding-bottom: 0; }
+.tool-section:first-child { padding-top: 0; }
+.tool-header {
+  display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px;
+}
+.tool-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.tool-icon.blue { background: var(--blue-lt); color: var(--blue); }
+.tool-icon.purple { background: var(--purple-lt); color: var(--purple); }
+.tool-title { font-size: .95rem; font-weight: 700; color: var(--text); }
+.tool-desc { font-size: .8rem; color: var(--text-secondary); margin-top: 2px; line-height: 1.4; }
+.tool-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* ── Select ── */
+select.form-select {
+  padding: 9px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: .82rem; background: var(--bg); color: var(--text);
+  outline: none; cursor: pointer; font-weight: 500;
+  transition: border-color var(--transition);
+}
+select.form-select:focus { border-color: var(--green); }
 
 /* ── Footer ── */
 footer {
-  text-align: center; padding: 24px;
-  font-size: .78rem; color: var(--muted);
-  border-top: 1px solid var(--border);
+  text-align: center; padding: 28px 24px;
+  font-size: .75rem; color: var(--muted);
+  border-top: 1px solid var(--border-lt);
+  line-height: 1.8;
 }
-footer a { color: var(--green); text-decoration: none; }
+footer a { color: var(--green); text-decoration: none; font-weight: 500; }
+footer a:hover { text-decoration: underline; }
+.footer-links { display: flex; gap: 20px; justify-content: center; margin-top: 4px; }
 
 /* ── Spinner ── */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinner {
   width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.3);
   border-top-color: #fff; border-radius: 50%;
-  animation: spin .7s linear infinite;
+  animation: spin .7s linear infinite; display: inline-block;
+}
+
+/* ── Auth button ── */
+.auth-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 14px; border-radius: 8px; font-size: .75rem; font-weight: 600;
+  cursor: pointer; border: 1.5px solid var(--border); background: var(--surface);
+  color: var(--text-secondary); transition: all var(--transition);
+}
+.auth-btn:hover { border-color: var(--green); color: var(--green); background: var(--green-lt); }
+.auth-btn img {
+  width: 20px; height: 20px; border-radius: 50%; object-fit: cover;
+}
+.auth-user-name { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auth-menu {
+  position: absolute; top: calc(100% + 6px); right: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-lg);
+  z-index: 200; min-width: 160px; display: none; overflow: hidden;
+}
+.auth-menu.open { display: block; }
+.auth-menu-item {
+  padding: 10px 16px; font-size: .8rem; cursor: pointer;
+  transition: background .1s; display: flex; align-items: center; gap: 8px;
+}
+.auth-menu-item:hover { background: var(--green-lt); }
+.auth-menu-item.danger { color: var(--red); }
+.auth-menu-item.danger:hover { background: var(--red-lt); }
+.auth-wrap { position: relative; }
+
+/* ── History button ── */
+.history-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 8px; font-size: .75rem; font-weight: 600;
+  cursor: pointer; border: 1.5px solid var(--border); background: var(--surface);
+  color: var(--text-secondary); transition: all var(--transition);
+}
+.history-btn:hover { border-color: var(--green); color: var(--green); background: var(--green-lt); }
+.history-btn .badge-count {
+  background: var(--green); color: #fff; border-radius: 10px;
+  padding: 0 6px; font-size: .65rem; min-width: 18px; text-align: center;
+  line-height: 16px;
+}
+
+/* ── Side Panel (History) ── */
+.side-panel-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.3);
+  z-index: 500; opacity: 0; pointer-events: none;
+  transition: opacity .3s ease;
+}
+.side-panel-overlay.open { opacity: 1; pointer-events: auto; }
+.side-panel {
+  position: fixed; top: 0; right: -420px; bottom: 0; width: 400px;
+  max-width: 90vw; background: var(--surface); z-index: 510;
+  box-shadow: -4px 0 24px rgba(0,0,0,.12);
+  transition: right .3s cubic-bezier(.4,0,.2,1);
+  display: flex; flex-direction: column;
+}
+.side-panel.open { right: 0; }
+.side-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.side-panel-title {
+  font-size: .95rem; font-weight: 700; display: flex; align-items: center; gap: 8px;
+}
+.side-panel-close {
+  width: 32px; height: 32px; border-radius: 8px; border: none;
+  background: var(--bg); cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+  color: var(--muted); transition: all var(--transition);
+}
+.side-panel-close:hover { background: var(--red-lt); color: var(--red); }
+.side-panel-body {
+  flex: 1; overflow-y: auto; padding: 16px 20px;
+}
+.side-panel-empty {
+  text-align: center; padding: 60px 20px; color: var(--muted);
+}
+.side-panel-empty svg { opacity: .3; margin-bottom: 12px; }
+
+/* History items */
+.history-date-label {
+  font-size: .68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--muted); padding: 12px 0 6px;
+  border-bottom: 1px solid var(--border-lt); margin-bottom: 8px;
+}
+.history-card {
+  padding: 12px 14px; border-radius: 10px;
+  border: 1px solid var(--border-lt); margin-bottom: 8px;
+  transition: all var(--transition); cursor: default;
+}
+.history-card:hover { border-color: var(--green); box-shadow: 0 2px 8px rgba(13,147,115,.06); }
+.history-card-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.history-type-icon {
+  width: 24px; height: 24px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: .7rem;
+}
+.history-type-icon.opt { background: var(--green-lt); color: var(--green); }
+.history-type-icon.re { background: var(--blue-lt); color: var(--blue); }
+.history-type-icon.rna { background: var(--purple-lt); color: var(--purple); }
+.history-type-icon.esm { background: var(--purple-lt); color: var(--purple); }
+.history-type-icon.blast { background: var(--blue-lt); color: var(--blue); }
+.history-card-title {
+  font-size: .8rem; font-weight: 600; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 1;
+}
+.history-card-meta {
+  font-size: .72rem; color: var(--muted); line-height: 1.5;
+}
+.history-card-actions {
+  display: flex; gap: 6px; margin-top: 8px;
+}
+.history-card-actions button {
+  padding: 4px 10px; border-radius: 6px; font-size: .7rem; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-secondary); transition: all var(--transition);
+}
+.history-card-actions button:hover { border-color: var(--green); color: var(--green); }
+.history-card-actions button.del-btn { color: var(--muted); }
+.history-card-actions button.del-btn:hover { border-color: var(--red); color: var(--red); background: var(--red-lt); }
+
+/* ── Responsive ── */
+@media (max-width: 640px) {
+  .tab-btn { font-size: .75rem; padding: 12px 10px; gap: 5px; }
+  .tab-content { padding: 20px 16px 24px; }
+  .section-title { font-size: 1.15rem; }
+  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .re-table { font-size: .72rem; }
+  .re-table th, .re-table td { padding: 8px; }
+  header { padding: 0 16px; }
+  .logo span { display: none; }
+  .side-panel { width: 100%; max-width: 100vw; right: -100%; }
+  .auth-user-name { display: none; }
 }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">ChlamyDesign <span>Chloroplast Gene Optimizer</span></div>
-  <div style="display:flex;align-items:center;gap:10px">
-    <span class="api-status" id="api-status"><span class="api-dot" id="api-dot"></span> <span id="api-label">Checking API...</span></span>
-    <span class="badge-header">Beta</span>
+  <div class="logo">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2"/>
+      <path d="M8 12c0-2.2 1.8-4 4-4s4 1.8 4 4-1.8 4-4 4"/>
+      <path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>
+    </svg>
+    CodonDesign <span data-i18n="logo_sub">Universal Codon Optimizer</span>
+  </div>
+  <div class="header-right">
+    <span class="api-status" id="api-status">
+      <span class="api-dot" id="api-dot"></span>
+      <span id="api-label" data-i18n="api_checking">Checking API...</span>
+    </span>
+    <button class="history-btn" id="history-btn" onclick="toggleHistoryPanel()" style="display:none">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span data-i18n="btn_history">History</span>
+      <span class="badge-count" id="history-count" style="display:none">0</span>
+    </button>
+    <div class="auth-wrap" id="auth-wrap">
+      <button class="auth-btn" id="auth-btn" onclick="handleAuthClick()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span id="auth-label" data-i18n="btn_login">Login</span>
+      </button>
+      <div class="auth-menu" id="auth-menu">
+        <div class="auth-menu-item" onclick="toggleHistoryPanel()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span data-i18n="menu_history">History</span>
+        </div>
+        <div class="auth-menu-item danger" onclick="handleLogout()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span data-i18n="menu_logout">Logout</span>
+        </div>
+      </div>
+    </div>
+    <div class="lang-toggle">
+      <button class="lang-btn active" id="lang-en" onclick="setLang('en')">EN</button>
+      <button class="lang-btn" id="lang-ja" onclick="setLang('ja')">JA</button>
+    </div>
   </div>
 </header>
 
 <main>
-  <h2>Optimize your gene for<br><em>C. reinhardtii</em> chloroplast expression</h2>
-  <p class="subtitle">
-    Enter a protein sequence to generate a codon-optimized DNA sequence
-    adapted to the chloroplast codon usage of <em>Chlamydomonas reinhardtii</em> (GC ~34%).
-  </p>
-
-  <!-- Input -->
-  <div class="card">
-    <div class="card-title">Protein Sequence</div>
-    <label for="seq-input">Amino acid sequence (single-letter code)</label>
-    <textarea
-      id="seq-input"
-      placeholder="MSPQTETKASVGFKAGVKEYKLTYYTPEYETKDTDILAAFRVTPQPG..."
-      spellcheck="false"
-      autocomplete="off"
-    ></textarea>
-    <div class="seq-hint">
-      <span>Standard amino acids only (A-Z, no gaps). Stop symbol * or _ optional.</span>
-      <span class="seq-len" id="seq-len">0 aa</span>
-    </div>
-    <div class="err-msg" id="err-msg">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 4a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0V5zm-.75 6.5a.875.875 0 1 0 0 1.75.875.875 0 0 0 0-1.75z"/></svg>
-      <span id="err-text"></span>
-    </div>
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('codon')" id="tab-btn-codon">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <span data-i18n="tab_codon">Codon Optimization</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('seqanalysis')" id="tab-btn-seqanalysis">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <span data-i18n="tab_seqanalysis">Sequence Analysis</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('protein')" id="tab-btn-protein">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      <span data-i18n="tab_protein">Protein Analysis</span>
+    </button>
   </div>
 
-  <!-- Strategy -->
-  <div class="card">
-    <div class="card-title">Optimization Strategy</div>
-    <div class="strategy-group">
-      <label class="strategy-pill">
-        <input type="radio" name="strategy" value="cai_max" checked>
-        <span class="dot"></span> CAI-max
-      </label>
-      <label class="strategy-pill">
-        <input type="radio" name="strategy" value="bfc">
-        <span class="dot"></span> BFC <span class="strategy-tag">stochastic</span>
-      </label>
-      <label class="strategy-pill" id="pill-basect">
-        <input type="radio" name="strategy" value="base_ct">
-        <span class="dot"></span> Base CT <span class="strategy-tag api-tag">API</span>
-      </label>
-      <label class="strategy-pill" id="pill-chlamyct">
-        <input type="radio" name="strategy" value="chlamyct">
-        <span class="dot"></span> ChlamyCT <span class="strategy-tag api-tag">API</span>
-      </label>
-    </div>
+  <div class="tab-content">
 
-    <!-- Slider panel for CT strategies -->
-    <div class="slider-panel" id="slider-panel">
-      <div class="slider-row">
-        <span class="slider-label">Candidates</span>
-        <input type="range" id="slider-seqs" min="1" max="20" value="1" step="1">
-        <span class="slider-val" id="val-seqs">1</span>
+    <!-- ═══ TAB 1: Codon Optimization ═══ -->
+    <div class="tab-panel active" id="panel-codon">
+      <div class="section-header">
+        <div class="section-title" id="main-title">Codon-optimize your gene for any of <strong>164 organisms</strong></div>
+        <p class="section-subtitle" id="main-subtitle">
+          Select a target organism and protein sequence to generate optimized DNA.
+          Powered by <a href="https://github.com/Adibvafa/CodonTransformer" target="_blank">CodonTransformer</a>.
+        </p>
       </div>
-      <div class="slider-row">
-        <span class="slider-label">Temperature</span>
-        <input type="range" id="slider-temp" min="0.1" max="1.0" value="0.2" step="0.1">
-        <span class="slider-val" id="val-temp">0.2</span>
+
+      <!-- Organism -->
+      <div class="form-group">
+        <div class="form-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span data-i18n="card_organism">Target Organism</span>
+        </div>
+        <div class="organism-selector" id="organism-selector">
+          <input type="text" class="organism-search" id="organism-search"
+            placeholder="Search organisms..." autocomplete="off" spellcheck="false"
+            data-i18n-placeholder="organism_placeholder">
+          <svg class="organism-search-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>
+          <div class="organism-dropdown" id="organism-dropdown"></div>
+        </div>
+        <div id="organism-info"></div>
       </div>
-      <p style="font-size:.73rem;color:var(--muted);margin-top:6px">
-        More candidates + higher temperature = more diverse options. Best GC% (~34%) is auto-selected.
-      </p>
-    </div>
 
-    <p style="font-size:.8rem;color:var(--muted);margin-top:10px">
-      <strong>CAI-max</strong>: always selects the most frequent codon per amino acid (~29% GC, maximum CSI).<br>
-      <strong>BFC</strong>: samples codons proportionally to their frequency, matching natural GC% (~33%).<br>
-      <strong>Base CT</strong>: CodonTransformer model (164 organisms) with match_protein guarantee.<br>
-      <strong>ChlamyCT</strong>: fine-tuned for chloroplast expression (requires API).
-    </p>
-  </div>
-
-  <!-- Run -->
-  <button class="btn-run" id="run-btn" onclick="runOptimization()">
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg>
-    Optimize
-  </button>
-
-  <!-- Results -->
-  <div id="results">
-    <div class="card" style="margin-top:20px">
-      <div class="card-title">Metrics</div>
-      <div class="metrics-grid">
-        <div class="metric-box">
-          <div class="metric-label">GC Content</div>
-          <div class="metric-value" id="m-gc">--</div>
-          <div class="metric-bar"><div class="metric-bar-fill" id="m-gc-bar" style="width:0%"></div></div>
-          <div class="gc-target-note"><span class="gc-dot"></span> Target: ~34%</div>
+      <!-- Sequence input -->
+      <div class="form-group">
+        <div class="form-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+          <span data-i18n="card_protein" id="seq-input-label">Protein Sequence</span>
+          <div class="input-type-toggle">
+            <label><input type="radio" name="input-type" value="protein" checked>Protein</label>
+            <label><input type="radio" name="input-type" value="dna">DNA</label>
+          </div>
         </div>
-        <div class="metric-box">
-          <div class="metric-label">Length</div>
-          <div class="metric-value" id="m-len">--</div>
-          <div class="metric-sub" id="m-len-sub"></div>
+        <textarea id="seq-input"
+          placeholder="MSPQTETKASVGFKAGVKEYKLTYYTPEYETKDTDILAAFRVTPQPG..."
+          spellcheck="false" autocomplete="off"></textarea>
+        <div class="seq-hint">
+          <span data-i18n="hint_input" id="seq-hint-text">Standard amino acids (A-Z). Stop symbol * or _ optional.</span>
+          <span class="seq-len" id="seq-len">0 aa</span>
         </div>
-        <div class="metric-box">
-          <div class="metric-label">CSI Score</div>
-          <div class="metric-value" id="m-csi">--</div>
-          <div class="metric-bar"><div class="metric-bar-fill" id="m-csi-bar" style="width:0%"></div></div>
-          <div class="metric-sub">Codon-chloroplast adaptation</div>
+        <div class="translated-preview" id="translated-preview">
+          <span class="label" data-i18n="translated_protein">Translated protein:</span>
+          <span id="translated-protein-text"></span>
         </div>
-        <div class="metric-box">
-          <div class="metric-label">Start / Stop</div>
-          <div class="metric-value" style="font-size:1.1rem" id="m-startstop">--</div>
-          <div class="metric-sub" id="m-startstop-sub"></div>
-        </div>
-        <!-- Extended metrics (populated by API) -->
-        <div class="metric-box" id="box-cfd" style="display:none">
-          <div class="metric-label">CFD</div>
-          <div class="metric-value" id="m-cfd">--</div>
-          <div class="metric-bar"><div class="metric-bar-fill" id="m-cfd-bar" style="width:0%"></div></div>
-          <div class="metric-sub">Codon Frequency Distance</div>
-        </div>
-        <div class="metric-box" id="box-minmax" style="display:none">
-          <div class="metric-label">%MinMax</div>
-          <div class="metric-value" id="m-minmax">--</div>
-          <div class="metric-bar"><div class="metric-bar-fill" id="m-minmax-bar" style="width:0%"></div></div>
-          <div class="metric-sub">Sliding window (18 nt)</div>
-        </div>
-        <div class="metric-box" id="box-cis" style="display:none">
-          <div class="metric-label">Cis-elements</div>
-          <div class="metric-value" id="m-cis">--</div>
-          <div class="metric-sub">SD-like, TATA, polyA</div>
-        </div>
-        <div class="metric-box" id="box-mfe" style="display:none">
-          <div class="metric-label">MFE</div>
-          <div class="metric-value" id="m-mfe">--</div>
-          <div class="metric-sub">kcal/mol (RNA stability)</div>
-        </div>
-        <div class="metric-box" id="box-complexity" style="display:none">
-          <div class="metric-label">Complexity</div>
-          <div class="metric-value" id="m-complexity">--</div>
-          <div class="metric-bar"><div class="metric-bar-fill" id="m-complexity-bar" style="width:0%"></div></div>
-          <div class="metric-sub">Sequence complexity</div>
+        <div class="err-msg" id="err-msg">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 4a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0V5zm-.75 6.5a.875.875 0 1 0 0 1.75.875.875 0 0 0 0-1.75z"/></svg>
+          <span id="err-text"></span>
         </div>
       </div>
-    </div>
 
-    <div class="card">
-      <div class="card-title">Optimized DNA Sequence</div>
-      <div class="dna-wrap" id="dna-output">
-        <button class="copy-btn" onclick="copyDNA()">Copy</button>
-        <div id="dna-colored"></div>
-      </div>
-      <div class="dl-row">
-        <button class="btn-dl" onclick="downloadFasta()">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7.25 10.44V2.75a.75.75 0 0 1 1.5 0v7.69l2.97-2.97a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L3.22 8.53a.75.75 0 0 1 1.06-1.06l2.97 2.97z"/></svg>
-          FASTA
+      <div class="form-divider"></div>
+
+      <!-- Strategy -->
+      <div class="form-group">
+        <div class="form-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          <span data-i18n="card_strategy">Strategy</span>
+        </div>
+        <div class="strategy-group">
+          <label class="strategy-pill">
+            <input type="radio" name="strategy" value="cai_max" checked>
+            <span class="dot"></span> CAI-max
+          </label>
+          <label class="strategy-pill">
+            <input type="radio" name="strategy" value="bfc">
+            <span class="dot"></span> BFC <span class="strategy-tag stoch-tag">stochastic</span>
+          </label>
+          <label class="strategy-pill" id="pill-basect">
+            <input type="radio" name="strategy" value="base_ct">
+            <span class="dot"></span> Base CT <span class="strategy-tag api-tag">API</span>
+          </label>
+          <label class="strategy-pill hidden" id="pill-chlamyct">
+            <input type="radio" name="strategy" value="chlamyct">
+            <span class="dot"></span> ChlamyCT <span class="strategy-tag api-tag">API</span>
+          </label>
+        </div>
+
+        <button class="strategy-toggle" id="strategy-toggle" onclick="toggleStrategyDesc()">
+          <span data-i18n="strategy_detail_toggle">What's the difference?</span>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M2 4l4 4 4-4"/></svg>
         </button>
-        <button class="btn-dl" onclick="downloadCSV()">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7.25 10.44V2.75a.75.75 0 0 1 1.5 0v7.69l2.97-2.97a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L3.22 8.53a.75.75 0 0 1 1.06-1.06l2.97 2.97z"/></svg>
-          CSV
+        <div class="strategy-detail" id="strategy-detail">
+          <div class="strategy-detail-inner" id="strategy-desc"></div>
+        </div>
+
+        <div class="slider-panel" id="slider-panel">
+          <div class="slider-row">
+            <span class="slider-label" data-i18n="slider_candidates">Candidates</span>
+            <input type="range" id="slider-seqs" min="1" max="20" value="1" step="1">
+            <span class="slider-val" id="val-seqs">1</span>
+          </div>
+          <div class="slider-row">
+            <span class="slider-label" data-i18n="slider_temperature">Temperature</span>
+            <input type="range" id="slider-temp" min="0.1" max="1.0" value="0.2" step="0.1">
+            <span class="slider-val" id="val-temp">0.2</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Run button -->
+      <div style="margin-top:24px">
+        <button class="btn-primary" id="run-btn" onclick="runOptimization()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg>
+          <span data-i18n="btn_optimize">Optimize</span>
         </button>
+        <span style="font-size:.72rem;color:var(--muted);margin-left:12px" data-i18n="shortcut_hint">Cmd+Enter</span>
+      </div>
+
+      <!-- Results -->
+      <div id="results">
+        <div class="result-section">
+          <div class="result-section-title" data-i18n="card_metrics">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+            Metrics
+          </div>
+          <div class="metrics-grid">
+            <div class="metric-box">
+              <div class="metric-label" data-i18n="metric_gc">GC Content</div>
+              <div class="metric-value" id="m-gc">--</div>
+              <div class="metric-bar"><div class="metric-bar-fill" id="m-gc-bar" style="width:0%"></div></div>
+              <div class="gc-target-note"><span class="gc-dot"></span> <span data-i18n="metric_gc_target" id="gc-target-label">Target: organism-specific</span></div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label" data-i18n="metric_length">Length</div>
+              <div class="metric-value" id="m-len">--</div>
+              <div class="metric-sub" id="m-len-sub"></div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label" data-i18n="metric_csi">CSI Score</div>
+              <div class="metric-value" id="m-csi">--</div>
+              <div class="metric-bar"><div class="metric-bar-fill" id="m-csi-bar" style="width:0%"></div></div>
+              <div class="metric-sub" data-i18n="metric_csi_sub">Codon adaptation index</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-label" data-i18n="metric_startstop">Start / Stop</div>
+              <div class="metric-value" style="font-size:1.05rem" id="m-startstop">--</div>
+              <div class="metric-sub" id="m-startstop-sub"></div>
+            </div>
+            <div class="metric-box" id="box-cfd" style="display:none">
+              <div class="metric-label">CFD</div>
+              <div class="metric-value" id="m-cfd">--</div>
+              <div class="metric-bar"><div class="metric-bar-fill" id="m-cfd-bar" style="width:0%"></div></div>
+            </div>
+            <div class="metric-box" id="box-minmax" style="display:none">
+              <div class="metric-label">%MinMax</div>
+              <div class="metric-value" id="m-minmax">--</div>
+              <div class="metric-bar"><div class="metric-bar-fill" id="m-minmax-bar" style="width:0%"></div></div>
+            </div>
+            <div class="metric-box" id="box-cis" style="display:none">
+              <div class="metric-label" data-i18n="metric_cis">Cis-elements</div>
+              <div class="metric-value" id="m-cis">--</div>
+              <div class="metric-sub" data-i18n="metric_cis_sub">SD-like, TATA, polyA</div>
+            </div>
+            <div class="metric-box" id="box-mfe" style="display:none">
+              <div class="metric-label">MFE</div>
+              <div class="metric-value" id="m-mfe">--</div>
+              <div class="metric-sub" data-i18n="metric_mfe_sub">kcal/mol</div>
+            </div>
+            <div class="metric-box" id="box-complexity" style="display:none">
+              <div class="metric-label" data-i18n="metric_complexity">Complexity</div>
+              <div class="metric-value" id="m-complexity">--</div>
+              <div class="metric-bar"><div class="metric-bar-fill" id="m-complexity-bar" style="width:0%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-section">
+          <div class="result-section-title" data-i18n="card_dna">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Optimized DNA
+          </div>
+          <div class="dna-wrap" id="dna-output">
+            <button class="copy-btn" onclick="copyDNA()" data-i18n="btn_copy">Copy</button>
+            <div id="dna-colored"></div>
+          </div>
+          <div class="dl-row">
+            <button class="btn-secondary" onclick="downloadFasta()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              FASTA
+            </button>
+            <button class="btn-secondary" onclick="downloadCSV()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              CSV
+            </button>
+            <button class="btn-text" onclick="sendToAnalysis()" data-i18n="btn_send_analysis">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              Analyze this sequence
+            </button>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Info -->
-  <div class="card" style="margin-top:8px">
-    <div class="card-title">About ChlamyDesign</div>
-    <dl class="info-grid">
-      <div class="info-item"><dt>Organism</dt><dd><em>Chlamydomonas reinhardtii</em> chloroplast</dd></div>
-      <div class="info-item"><dt>Codon table</dt><dd>Plastid code (Table 11) · 69 reference genes</dd></div>
-      <div class="info-item"><dt>Target GC%</dt><dd>~34% (vs nuclear ~64%)</dd></div>
-      <div class="info-item"><dt>Model</dt><dd>CodonTransformer (base) + ChlamyCT (fine-tuned)</dd></div>
-      <div class="info-item"><dt>Institution</dt><dd>Waseda University — Nishimura Lab</dd></div>
-      <div class="info-item"><dt>Reference genome</dt><dd>GenBank BK000554</dd></div>
-    </dl>
-  </div>
+    <!-- ═══ TAB 2: Sequence Analysis ═══ -->
+    <div class="tab-panel" id="panel-seqanalysis">
+      <div class="section-header">
+        <div class="section-title" data-i18n="sa_title">Sequence Analysis</div>
+        <p class="section-subtitle" data-i18n="sa_subtitle">Analyze restriction sites and RNA secondary structure in your DNA sequence.</p>
+      </div>
+
+      <!-- DNA input -->
+      <div class="form-group">
+        <div class="form-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+          <span data-i18n="sa_input_title">DNA Sequence</span>
+        </div>
+        <textarea id="sa-dna-input"
+          placeholder="ATGTCTCCTCAAACTGAAACAAAAGCTTCTGTTGGATTTAAAGCTGGTGTT..."
+          spellcheck="false" autocomplete="off" style="min-height:80px"></textarea>
+        <div class="seq-hint">
+          <span data-i18n="sa_input_hint">Paste DNA or use result from Codon Optimization.</span>
+          <span class="seq-len" id="sa-seq-len">0 nt</span>
+        </div>
+      </div>
+
+      <div class="form-divider"></div>
+
+      <!-- Restriction enzymes -->
+      <div class="tool-section">
+        <div class="tool-header">
+          <div class="tool-icon blue">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </div>
+          <div>
+            <div class="tool-title" data-i18n="re_title">Restriction Enzyme Analysis</div>
+            <div class="tool-desc" data-i18n="re_desc">Find restriction enzyme sites for cloning strategy design.</div>
+          </div>
+        </div>
+        <div class="tool-actions">
+          <button class="btn-primary btn-blue" id="re-run-btn" onclick="runRestriction()" style="padding:10px 20px;font-size:.82rem">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg>
+            <span data-i18n="re_run_btn">Analyze</span>
+          </button>
+          <select class="form-select" id="re-enzyme-set">
+            <option value="common" data-i18n="re_common">Common enzymes (30)</option>
+            <option value="golden_gate" data-i18n="re_golden_gate">Golden Gate</option>
+            <option value="gibson" data-i18n="re_gibson">Gibson Assembly</option>
+          </select>
+        </div>
+        <div class="err-msg" id="re-err-msg"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 4a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0V5zm-.75 6.5a.875.875 0 1 0 0 1.75.875.875 0 0 0 0-1.75z"/></svg><span id="re-err-text"></span></div>
+        <div id="re-results" style="display:none"></div>
+      </div>
+
+      <!-- RNA Structure -->
+      <div class="tool-section">
+        <div class="tool-header">
+          <div class="tool-icon purple">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <div>
+            <div class="tool-title" data-i18n="rna_title">RNA Secondary Structure</div>
+            <div class="tool-desc" data-i18n="rna_desc">Predict RNA folding and minimum free energy (MFE).</div>
+          </div>
+        </div>
+        <!-- 5' UTR input -->
+        <div style="margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;font-weight:600;color:var(--muted);margin-bottom:6px">
+            <span data-i18n="rna_utr_label">5' UTR / Promoter (optional)</span>
+            <span class="rna-tooltip">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="opacity:.5"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm-.75 3a.75.75 0 0 1 1.5 0v0a.75.75 0 0 1-1.5 0zm-.25 2.5h2v5h-2z"/></svg>
+              <span class="rna-tooltip-text" data-i18n="rna_utr_hint">Sequence prepended to optimized DNA for structure prediction</span>
+            </span>
+          </label>
+          <input type="text" class="rna-utr-input" id="rna-utr-input" data-i18n-placeholder="rna_utr_placeholder" placeholder="5'側に付加するDNA配列を入力...">
+        </div>
+        <div class="tool-actions">
+          <button class="btn-primary btn-purple" id="rna-run-btn" onclick="runRNAStructure()" style="padding:10px 20px;font-size:.82rem">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg>
+            <span data-i18n="rna_run_btn">Predict</span>
+          </button>
+          <select class="form-select" id="rna-region">
+            <option value="full" data-i18n="rna_full">Full sequence</option>
+            <option value="5utr" data-i18n="rna_5utr">5' region (100 nt)</option>
+            <option value="3utr" data-i18n="rna_3utr">3' region (100 nt)</option>
+          </select>
+        </div>
+        <div class="err-msg" id="rna-err-msg"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 4a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0V5zm-.75 6.5a.875.875 0 1 0 0 1.75.875.875 0 0 0 0-1.75z"/></svg><span id="rna-err-text"></span></div>
+        <div id="rna-results" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- ═══ TAB 3: Protein Analysis ═══ -->
+    <div class="tab-panel" id="panel-protein">
+      <div class="section-header">
+        <div class="section-title" data-i18n="pa_title">Protein Analysis</div>
+        <p class="section-subtitle" data-i18n="pa_subtitle">Predict 3D structure and find homologous proteins.</p>
+      </div>
+
+      <!-- Protein input -->
+      <div class="form-group">
+        <div class="form-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+          <span data-i18n="pa_input_title">Protein Sequence</span>
+        </div>
+        <textarea id="pa-protein-input"
+          placeholder="MSPQTETKASVGFKAGVKEYKLTYYTPEYETKDTDILAAFRVTPQPG..."
+          spellcheck="false" autocomplete="off" style="min-height:80px"></textarea>
+        <div class="seq-hint">
+          <span data-i18n="pa_input_hint">Max 400 residues for ESMFold.</span>
+          <span class="seq-len" id="pa-seq-len">0 aa</span>
+        </div>
+      </div>
+
+      <div class="form-divider"></div>
+
+      <!-- ESMFold -->
+      <div class="tool-section">
+        <div class="tool-header">
+          <div class="tool-icon purple">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          </div>
+          <div>
+            <div class="tool-title" data-i18n="esm_title">ESMFold 3D Structure</div>
+            <div class="tool-desc" data-i18n="esm_desc">Predict 3D structure using ESMFold (Meta AI). Visualized with 3Dmol.js.</div>
+          </div>
+        </div>
+        <div class="tool-actions">
+          <button class="btn-primary btn-purple" id="esm-run-btn" onclick="runESMFold()" style="padding:10px 20px;font-size:.82rem">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg>
+            <span data-i18n="esm_run_btn">Predict 3D Structure</span>
+          </button>
+        </div>
+        <div class="err-msg" id="esm-err-msg"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 4a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0V5zm-.75 6.5a.875.875 0 1 0 0 1.75.875.875 0 0 0 0-1.75z"/></svg><span id="esm-err-text"></span></div>
+        <div id="esm-results" style="display:none">
+          <div id="esm-viewer"></div>
+          <div class="viewer-controls" id="esm-controls">
+            <button class="viewer-ctrl-btn active" onclick="setESMStyle('cartoon')">Cartoon</button>
+            <button class="viewer-ctrl-btn" onclick="setESMStyle('stick')">Stick</button>
+            <button class="viewer-ctrl-btn" onclick="setESMStyle('sphere')">Sphere</button>
+            <span style="width:1px;height:20px;background:var(--border);margin:0 4px"></span>
+            <button class="viewer-ctrl-btn" onclick="setESMColor('spectrum')">Rainbow</button>
+            <button class="viewer-ctrl-btn" onclick="setESMColor('confidence')">Confidence</button>
+            <button class="btn-secondary" onclick="downloadPDB()" style="margin-left:auto;padding:6px 14px;font-size:.75rem">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              PDB
+            </button>
+          </div>
+          <div class="esm-info" id="esm-info"></div>
+        </div>
+      </div>
+
+      <!-- BLAST -->
+      <div class="tool-section">
+        <div class="tool-header">
+          <div class="tool-icon blue">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </div>
+          <div>
+            <div class="tool-title" data-i18n="blast_title">BLAST Homology Search</div>
+            <div class="tool-desc" data-i18n="blast_desc">Search NCBI for homologous proteins (30s-2min).</div>
+          </div>
+        </div>
+        <div class="tool-actions">
+          <button class="btn-primary btn-blue" id="blast-run-btn" onclick="runBLAST()" style="padding:10px 20px;font-size:.82rem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span data-i18n="blast_run_btn">Search BLAST</span>
+          </button>
+          <select class="form-select" id="blast-db">
+            <option value="nr">nr (Non-redundant)</option>
+            <option value="swissprot">SwissProt (Curated)</option>
+            <option value="pdb">PDB (Structures)</option>
+          </select>
+        </div>
+        <div class="err-msg" id="blast-err-msg"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 4a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0V5zm-.75 6.5a.875.875 0 1 0 0 1.75.875.875 0 0 0 0-1.75z"/></svg><span id="blast-err-text"></span></div>
+        <div id="blast-results" style="display:none"></div>
+      </div>
+    </div>
+
+  </div><!-- /tab-content -->
 </main>
 
 <footer>
-  ChlamyDesign · Waseda University ·
-  <a href="https://github.com/yamauchiyuhei/ChlamyDesign" target="_blank">GitHub</a>
+  <div>CodonDesign — <span data-i18n="info_institution_val">Waseda University, Nishimura Lab</span></div>
+  <div class="footer-links">
+    <a href="https://github.com/Adibvafa/CodonTransformer" target="_blank">CodonTransformer</a>
+    <a href="https://github.com/yamauchiyuhei/ChlamyDesign" target="_blank">GitHub</a>
+    <span style="color:var(--border)">164 organisms · BigBird model</span>
+  </div>
 </footer>
 
 <script>
-// ── C. reinhardtii chloroplast codon frequency table (client-side fallback)
-const CODON_FREQ = {
-  A: { GCT:0.42, GCA:0.30, GCC:0.17, GCG:0.11 },
-  R: { AGA:0.40, AGG:0.20, CGT:0.18, CGA:0.12, CGC:0.06, CGG:0.04 },
-  N: { AAT:0.62, AAC:0.38 },
-  D: { GAT:0.65, GAC:0.35 },
-  C: { TGT:0.58, TGC:0.42 },
-  Q: { CAA:0.72, CAG:0.28 },
-  E: { GAA:0.68, GAG:0.32 },
-  G: { GGT:0.38, GGA:0.32, GGC:0.16, GGG:0.14 },
-  H: { CAT:0.58, CAC:0.42 },
-  I: { ATT:0.50, ATA:0.35, ATC:0.15 },
-  L: { TTA:0.35, TTG:0.24, CTT:0.18, CTA:0.13, CTG:0.06, CTC:0.04 },
-  K: { AAA:0.70, AAG:0.30 },
-  M: { ATG:1.00 },
-  F: { TTT:0.60, TTC:0.40 },
-  P: { CCT:0.38, CCA:0.32, CCC:0.18, CCG:0.12 },
-  S: { TCT:0.28, TCA:0.24, AGT:0.20, AGC:0.14, TCC:0.08, TCG:0.06 },
-  T: { ACT:0.38, ACA:0.32, ACC:0.18, ACG:0.12 },
-  W: { TGG:1.00 },
-  Y: { TAT:0.62, TAC:0.38 },
-  V: { GTT:0.40, GTA:0.30, GTC:0.16, GTG:0.14 },
+// ══════════════════════════════════════════════════════════════════
+// i18n
+// ══════════════════════════════════════════════════════════════════
+const I18N = {
+  en: {
+    logo_sub: 'Universal Codon Optimizer',
+    api_checking: 'Checking...', api_online: 'API online', api_offline: 'API offline',
+    tab_codon: 'Codon Optimization', tab_seqanalysis: 'Sequence Analysis', tab_protein: 'Protein Analysis',
+    main_title: 'Codon-optimize your gene for any of <strong>164 organisms</strong>',
+    main_subtitle: 'Select a target organism and protein sequence to generate optimized DNA. Powered by <a href="https://github.com/Adibvafa/CodonTransformer" target="_blank">CodonTransformer</a>.',
+    card_organism: 'Target Organism', organism_placeholder: 'Search organisms...', organism_selected: 'Selected',
+    card_protein: 'Protein Sequence', card_dna_input: 'DNA Sequence',
+    label_input: 'Amino acid sequence (single-letter code)',
+    hint_input: 'Standard amino acids (A-Z). Stop symbol * or _ optional.',
+    hint_input_dna: 'DNA sequence (A/T/G/C). Must be multiples of 3.',
+    translated_protein: 'Translated protein:',
+    err_dna_invalid: 'Invalid DNA. Only A, T, G, C allowed.',
+    err_dna_not_triplet: 'DNA length must be a multiple of 3.',
+    err_dna_short: 'DNA must be at least 9 nt (3 codons).',
+    err_dna_long_opt: 'DNA too long (max 9000 nt).',
+    card_strategy: 'Strategy', strategy_detail_toggle: "What's the difference?",
+    strategy_desc: '<strong>CAI-max</strong> — Always picks the most frequent codon (maximum adaptation).<br><strong>BFC</strong> — Samples codons proportionally to natural frequency.<br><strong>Base CT</strong> — CodonTransformer deep learning model (164 organisms).<br><strong>ChlamyCT</strong> — Fine-tuned for <em>C. reinhardtii</em> chloroplast.',
+    slider_candidates: 'Candidates', slider_temperature: 'Temperature',
+    btn_optimize: 'Optimize', btn_generating: 'Generating...', btn_optimizing: 'Optimizing...',
+    shortcut_hint: 'Cmd+Enter',
+    card_metrics: 'Metrics', metric_gc: 'GC Content', metric_gc_target: 'Target: organism-specific',
+    metric_length: 'Length', metric_csi: 'CSI Score', metric_csi_sub: 'Codon adaptation index',
+    metric_startstop: 'Start / Stop', metric_startstop_valid: 'Valid ORF', metric_startstop_check: 'Check codons',
+    metric_cis: 'Cis-elements', metric_cis_sub: 'SD-like, TATA, polyA',
+    metric_mfe_sub: 'kcal/mol', metric_complexity: 'Complexity', metric_complexity_sub: 'Sequence complexity',
+    card_dna: 'Optimized DNA', btn_copy: 'Copy', btn_copied: 'Copied!',
+    btn_send_analysis: 'Analyze this sequence →',
+    info_institution_val: 'Waseda University, Nishimura Lab',
+    err_empty: 'Please enter a protein sequence.', err_short: 'Sequence must be at least 3 amino acids.',
+    err_long: 'Sequence too long (max 3000 aa).', err_invalid_aa: 'Invalid amino acid: "{aa}".',
+    err_api: 'API error: ',
+    group_popular: 'Popular', group_all: 'All organisms',
+    sa_title: 'Sequence Analysis', sa_subtitle: 'Analyze restriction sites and RNA secondary structure in your DNA sequence.',
+    sa_input_title: 'DNA Sequence', sa_input_hint: 'Paste DNA or use result from Codon Optimization.',
+    re_title: 'Restriction Enzyme Analysis', re_desc: 'Find restriction enzyme sites for cloning strategy design.',
+    re_run_btn: 'Analyze', re_common: 'Common enzymes (30)', re_golden_gate: 'Golden Gate', re_gibson: 'Gibson Assembly',
+    re_summary_enzymes: 'Checked', re_summary_sites: 'Sites found', re_summary_unique: 'Unique cutters',
+    re_no_sites: 'No restriction sites found.',
+    re_col_enzyme: 'Enzyme', re_col_site: 'Site', re_col_cuts: 'Cuts', re_col_positions: 'Positions', re_col_fragments: 'Fragments',
+    rna_title: 'RNA Secondary Structure', rna_desc: 'Predict RNA folding and minimum free energy (MFE).',
+    rna_run_btn: 'Predict', rna_full: 'Full sequence', rna_5utr: "5' region (100 nt)", rna_3utr: "3' region (100 nt)",
+    rna_mfe: 'MFE', rna_length: 'Length', rna_gc: 'GC%', rna_pairs: 'Base Pairs', rna_region: 'Region',
+    rna_utr_label: "5' UTR / Promoter (optional)", rna_utr_hint: 'Sequence prepended to optimized DNA for structure prediction',
+    rna_utr_placeholder: 'Enter DNA sequence to prepend to 5\' end...',
+    rna_ensemble_energy: 'Ensemble Energy', rna_ensemble_diversity: 'Ensemble Diversity',
+    rna_badge_vienna: 'ViennaRNA RNAfold', rna_badge_nussinov: 'Nussinov (client)',
+    rna_2d_title: '2D Structure', rna_mountain_title: 'Mountain Plot',
+    rna_entropy_title: 'Positional Entropy',
+    rna_y_height: 'height', rna_y_entropy: 'entropy', rna_x_pos: 'position (nt)',
+    rna_mountain_mfe: 'MFE structure', rna_mountain_pf: 'Partition func.', rna_mountain_centroid: 'Centroid structure',
+    rna_color_base: 'Base', rna_color_pos: "5'\u21923'", rna_color_pair: 'Pair',
+    rna_zoom_hint: '+/- to zoom, drag to move',
+    pa_title: 'Protein Analysis', pa_subtitle: 'Predict 3D structure and find homologous proteins.',
+    pa_input_title: 'Protein Sequence', pa_input_hint: 'Max 400 residues for ESMFold.',
+    esm_title: 'ESMFold 3D Structure', esm_desc: 'Predict 3D structure using ESMFold (Meta AI). Visualized with 3Dmol.js.',
+    esm_run_btn: 'Predict 3D Structure', esm_generating: 'Predicting (10-30s)...',
+    esm_length: 'Residues', esm_avg_plddt: 'Avg pLDDT',
+    blast_title: 'BLAST Homology Search', blast_desc: 'Search NCBI for homologous proteins (30s-2min).',
+    blast_run_btn: 'Search BLAST', blast_searching: 'Searching...', blast_waiting: 'Waiting for BLAST results...',
+    blast_no_hits: 'No significant hits found.',
+    blast_identity: 'Identity', blast_evalue: 'E-value', blast_score: 'Score', blast_coverage: 'Coverage',
+    err_dna_empty: 'Please enter a DNA sequence.', err_protein_empty: 'Please enter a protein sequence.',
+    err_esm_long: 'Max 400 residues for ESMFold.',
+    btn_login: 'Login', btn_history: 'History',
+    menu_history: 'History', menu_logout: 'Logout',
+    panel_history_title: 'History',
+    history_empty: 'No history yet', history_empty_sub: 'Results will be saved here after optimization.',
+    history_login_prompt: 'Login to save history',
+    history_restore: 'Restore', history_delete: 'Delete',
+    history_type_opt: 'Codon Optimization', history_type_re: 'Restriction Analysis',
+    history_type_rna: 'RNA Structure', history_type_esm: 'ESMFold 3D', history_type_blast: 'BLAST Search',
+  },
+  ja: {
+    logo_sub: '汎用コドン最適化ツール',
+    api_checking: '確認中...', api_online: 'API接続中', api_offline: 'APIオフライン',
+    tab_codon: 'コドン最適化', tab_seqanalysis: '配列解析', tab_protein: 'タンパク質解析',
+    main_title: '<strong>164生物種</strong>に対応した遺伝子コドン最適化',
+    main_subtitle: '対象生物種とタンパク質配列を入力し、最適化DNA配列を生成。<a href="https://github.com/Adibvafa/CodonTransformer" target="_blank">CodonTransformer</a> 搭載。',
+    card_organism: '対象生物種', organism_placeholder: '生物種を検索...', organism_selected: '選択中',
+    card_protein: 'タンパク質配列', card_dna_input: 'DNA配列',
+    label_input: 'アミノ酸配列（1文字コード）',
+    hint_input: '標準アミノ酸のみ（A-Z）。終止記号 * / _ は任意。',
+    hint_input_dna: 'DNA配列（A/T/G/C）。3の倍数であること。',
+    translated_protein: '翻訳タンパク質:',
+    err_dna_invalid: '無効なDNAです。A, T, G, Cのみ使用可能。',
+    err_dna_not_triplet: 'DNA長は3の倍数である必要があります。',
+    err_dna_short: 'DNAは最低9 nt（3コドン）必要です。',
+    err_dna_long_opt: 'DNAが長すぎます（最大9000 nt）。',
+    card_strategy: '最適化戦略', strategy_detail_toggle: '戦略の違いは？',
+    strategy_desc: '<strong>CAI-max</strong> — 最高頻度コドンを常に選択（最大適応度）。<br><strong>BFC</strong> — 自然頻度に比例して確率的に選択。<br><strong>Base CT</strong> — CodonTransformer深層学習モデル（164生物種）。<br><strong>ChlamyCT</strong> — <em>C. reinhardtii</em> 葉緑体に特化。',
+    slider_candidates: '候補数', slider_temperature: '温度',
+    btn_optimize: '最適化', btn_generating: 'AI生成中...', btn_optimizing: '最適化中...',
+    shortcut_hint: 'Cmd+Enter',
+    card_metrics: '評価指標', metric_gc: 'GC含量', metric_gc_target: '目標: 生物種依存',
+    metric_length: '配列長', metric_csi: 'CSI', metric_csi_sub: 'コドン適応度指標',
+    metric_startstop: '開始/終止', metric_startstop_valid: '正常なORF', metric_startstop_check: '確認必要',
+    metric_cis: 'シス配列', metric_cis_sub: 'SD様、TATA、polyA',
+    metric_mfe_sub: 'kcal/mol', metric_complexity: '複雑度', metric_complexity_sub: '配列の複雑さ',
+    card_dna: '最適化DNA', btn_copy: 'コピー', btn_copied: 'コピー済',
+    btn_send_analysis: 'この配列を解析 →',
+    info_institution_val: '早稲田大学 西村研究室',
+    err_empty: '配列を入力してください。', err_short: '3アミノ酸以上必要です。',
+    err_long: '長すぎます（最大3000 aa）。', err_invalid_aa: '無効なアミノ酸: "{aa}"',
+    err_api: 'APIエラー: ',
+    group_popular: 'よく使われる生物種', group_all: 'すべての生物種',
+    sa_title: '配列解析', sa_subtitle: 'DNA配列の制限酵素サイトとRNA二次構造を解析します。',
+    sa_input_title: 'DNA配列', sa_input_hint: 'DNAを貼り付けるか、コドン最適化の結果を使用。',
+    re_title: '制限酵素サイト解析', re_desc: 'クローニング戦略設計のための制限酵素サイト検索。',
+    re_run_btn: '解析', re_common: '一般的な酵素 (30)', re_golden_gate: 'Golden Gate', re_gibson: 'Gibson Assembly',
+    re_summary_enzymes: 'チェック数', re_summary_sites: '認識部位数', re_summary_unique: 'ユニーク',
+    re_no_sites: '制限酵素サイトなし。',
+    re_col_enzyme: '酵素', re_col_site: '認識配列', re_col_cuts: '切断', re_col_positions: '位置', re_col_fragments: 'フラグメント',
+    rna_title: 'RNA二次構造', rna_desc: 'RNA折り畳みと最小自由エネルギー（MFE）の予測。',
+    rna_run_btn: '予測', rna_full: '全配列', rna_5utr: "5'領域 (100 nt)", rna_3utr: "3'領域 (100 nt)",
+    rna_mfe: 'MFE', rna_length: '配列長', rna_gc: 'GC%', rna_pairs: '塩基対', rna_region: '領域',
+    rna_utr_label: "5' UTR / プロモーター配列（任意）", rna_utr_hint: '入力した配列が最適化配列の5\'側に結合された状態で二次構造を予測します',
+    rna_utr_placeholder: "5'側に付加するDNA配列を入力...",
+    rna_ensemble_energy: 'アンサンブルエネルギー', rna_ensemble_diversity: 'アンサンブル多様性',
+    rna_badge_vienna: 'ViennaRNA RNAfold', rna_badge_nussinov: 'Nussinov (client)',
+    rna_2d_title: '2D構造図', rna_mountain_title: 'マウンテンプロット',
+    rna_entropy_title: '位置エントロピー',
+    rna_y_height: '高さ', rna_y_entropy: 'エントロピー', rna_x_pos: '位置 (nt)',
+    rna_mountain_mfe: 'MFE構造', rna_mountain_pf: '分配関数', rna_mountain_centroid: 'セントロイド構造',
+    rna_color_base: '塩基', rna_color_pos: "5'\u21923'", rna_color_pair: '対合',
+    rna_zoom_hint: '+/- でズーム・ドラッグで移動',
+    pa_title: 'タンパク質解析', pa_subtitle: '3D構造予測と相同タンパク質検索。',
+    pa_input_title: 'タンパク質配列', pa_input_hint: 'ESMFoldは最大400残基。',
+    esm_title: 'ESMFold 3D構造', esm_desc: 'ESMFold（Meta AI）で3D構造予測。3Dmol.jsで可視化。',
+    esm_run_btn: '3D構造を予測', esm_generating: '構造予測中（10-30秒）...',
+    esm_length: '残基数', esm_avg_plddt: '平均pLDDT',
+    blast_title: 'BLAST相同性検索', blast_desc: 'NCBIで相同タンパク質を検索（30秒〜2分）。',
+    blast_run_btn: 'BLAST検索', blast_searching: '検索中...', blast_waiting: 'BLAST結果を待機中...',
+    blast_no_hits: 'ヒットなし。',
+    blast_identity: '一致度', blast_evalue: 'E値', blast_score: 'スコア', blast_coverage: 'カバレッジ',
+    err_dna_empty: 'DNA配列を入力してください。', err_protein_empty: 'タンパク質配列を入力してください。',
+    err_esm_long: 'ESMFoldは最大400残基です。',
+    btn_login: 'ログイン', btn_history: '履歴',
+    menu_history: '履歴', menu_logout: 'ログアウト',
+    panel_history_title: '履歴',
+    history_empty: '履歴がありません', history_empty_sub: '最適化を実行すると自動で保存されます。',
+    history_login_prompt: 'ログインで履歴を保存',
+    history_restore: '復元', history_delete: '削除',
+    history_type_opt: 'コドン最適化', history_type_re: '制限酵素解析',
+    history_type_rna: 'RNA構造', history_type_esm: 'ESMFold 3D', history_type_blast: 'BLAST検索',
+  }
 };
 
-const STOP_CODONS = ['TAA','TAG','TGA'];
-const VALID_AA = new Set('ACDEFGHIKLMNPQRSTVWY');
-const CT_STRATEGIES = ['base_ct', 'chlamyct'];
+let currentLang = localStorage.getItem('codondesign-lang') || 'en';
 
-let lastDNA = '';
-let lastProtein = '';
-let apiAvailable = false;
+function t(key, replacements) {
+  let text = I18N[currentLang][key] || I18N['en'][key] || key;
+  if (replacements) for (const [k, v] of Object.entries(replacements)) text = text.replace(`{${k}}`, v);
+  return text;
+}
 
-// ── API health check
-async function checkAPIHealth() {
-  const dot = document.getElementById('api-dot');
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('codondesign-lang', lang);
+  document.documentElement.lang = lang;
+  document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+  document.getElementById('lang-ja').classList.toggle('active', lang === 'ja');
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    const val = I18N[lang][key];
+    if (val !== undefined) el.innerHTML = val;
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    const val = I18N[lang][key];
+    if (val !== undefined) el.placeholder = val;
+  });
+  document.getElementById('main-title').innerHTML = t('main_title');
+  document.getElementById('main-subtitle').innerHTML = t('main_subtitle');
+  document.getElementById('strategy-desc').innerHTML = t('strategy_desc');
   const label = document.getElementById('api-label');
-  try {
-    const ctrl = new AbortController();
-    setTimeout(() => ctrl.abort(), 5000);
-    const resp = await fetch('/api/health', { signal: ctrl.signal });
-    if (resp.ok) {
-      apiAvailable = true;
-      dot.classList.add('online');
-      label.textContent = 'API online';
-      enableCTPills();
-      return;
-    }
-  } catch (e) { /* offline */ }
-  apiAvailable = false;
-  dot.classList.add('offline');
-  label.textContent = 'API offline';
-  disableCTPills();
+  if (apiAvailable) label.textContent = t('api_online');
+  else if (label.textContent !== t('api_checking')) label.textContent = t('api_offline');
+  const btn = document.getElementById('run-btn');
+  if (!btn.disabled) btn.querySelector('[data-i18n]').innerHTML = t('btn_optimize');
+  document.title = lang === 'ja' ? 'CodonDesign — 汎用コドン最適化ツール' : 'CodonDesign — Universal Codon Optimizer';
+  // Update input type toggle labels based on current mode
+  const seqLabel = document.getElementById('seq-input-label');
+  const seqHint = document.getElementById('seq-hint-text');
+  if (inputType === 'dna') { seqLabel.textContent = t('card_dna_input'); seqHint.textContent = t('hint_input_dna'); }
+  else { seqLabel.textContent = t('card_protein'); seqHint.textContent = t('hint_input'); }
+  renderOrganismDropdown();
 }
 
-function enableCTPills() {
-  document.getElementById('pill-basect').classList.remove('disabled');
-  document.getElementById('pill-basect').querySelector('input').disabled = false;
-  document.getElementById('pill-chlamyct').classList.remove('disabled');
-  document.getElementById('pill-chlamyct').querySelector('input').disabled = false;
+// ── Tab switching ──
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-btn-' + tabId).classList.add('active');
+  document.getElementById('panel-' + tabId).classList.add('active');
 }
 
-function disableCTPills() {
-  document.getElementById('pill-basect').classList.add('disabled');
-  document.getElementById('pill-basect').querySelector('input').disabled = true;
-  document.getElementById('pill-chlamyct').classList.add('disabled');
-  document.getElementById('pill-chlamyct').querySelector('input').disabled = true;
+// ── Strategy description toggle ──
+function toggleStrategyDesc() {
+  const detail = document.getElementById('strategy-detail');
+  const toggle = document.getElementById('strategy-toggle');
+  detail.classList.toggle('open');
+  toggle.classList.toggle('open');
 }
 
-// Start with CT pills disabled until API health check completes
-disableCTPills();
-checkAPIHealth();
+// ── Send optimized DNA to analysis tab ──
+function sendToAnalysis() {
+  if (!lastDNA) return;
+  document.getElementById('sa-dna-input').value = lastDNA;
+  document.getElementById('sa-seq-len').textContent = lastDNA.length + ' nt';
+  switchTab('seqanalysis');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
-// ── Sequence length counter
-document.getElementById('seq-input').addEventListener('input', function() {
-  const clean = cleanProtein(this.value);
-  const len = clean.replace(/[_*]/g, '').length;
-  document.getElementById('seq-len').textContent = len + ' aa';
-  clearError();
-  if (document.getElementById('results').classList.contains('visible')) {
-    document.getElementById('results').classList.remove('visible');
+// ══════════════════════════════════════════════════════════════════
+// Organism data
+// ══════════════════════════════════════════════════════════════════
+const POPULAR_ORGANISMS = [
+  'Chlamydomonas reinhardtii chloroplast','Chlamydomonas reinhardtii',
+  'Escherichia coli general','Homo sapiens','Saccharomyces cerevisiae',
+  'Mus musculus','Arabidopsis thaliana','Danio rerio',
+  'Drosophila melanogaster','Bacillus subtilis','Caenorhabditis elegans',
+  'Nicotiana tabacum','Pseudomonas putida',
+];
+const CHLAMYDOMONAS_ORGANISMS = ['Chlamydomonas reinhardtii chloroplast','Chlamydomonas reinhardtii'];
+let allOrganisms = [];
+let selectedOrganism = '';
+const CHLAMY_CODON_FREQ = {
+  A:{GCT:.42,GCA:.30,GCC:.17,GCG:.11},R:{AGA:.40,AGG:.20,CGT:.18,CGA:.12,CGC:.06,CGG:.04},
+  N:{AAT:.62,AAC:.38},D:{GAT:.65,GAC:.35},C:{TGT:.58,TGC:.42},Q:{CAA:.72,CAG:.28},
+  E:{GAA:.68,GAG:.32},G:{GGT:.38,GGA:.32,GGC:.16,GGG:.14},H:{CAT:.58,CAC:.42},
+  I:{ATT:.50,ATA:.35,ATC:.15},L:{TTA:.35,TTG:.24,CTT:.18,CTA:.13,CTG:.06,CTC:.04},
+  K:{AAA:.70,AAG:.30},M:{ATG:1},F:{TTT:.60,TTC:.40},P:{CCT:.38,CCA:.32,CCC:.18,CCG:.12},
+  S:{TCT:.28,TCA:.24,AGT:.20,AGC:.14,TCC:.08,TCG:.06},T:{ACT:.38,ACA:.32,ACC:.18,ACG:.12},
+  W:{TGG:1},Y:{TAT:.62,TAC:.38},V:{GTT:.40,GTA:.30,GTC:.16,GTG:.14},
+};
+let clientCodonFreq = CHLAMY_CODON_FREQ;
+
+/* ── Standard genetic code: codon → amino acid ── */
+const DNA_TO_AA = {
+  TTT:'F',TTC:'F',TTA:'L',TTG:'L',CTT:'L',CTC:'L',CTA:'L',CTG:'L',
+  ATT:'I',ATC:'I',ATA:'I',ATG:'M',GTT:'V',GTC:'V',GTA:'V',GTG:'V',
+  TCT:'S',TCC:'S',TCA:'S',TCG:'S',CCT:'P',CCC:'P',CCA:'P',CCG:'P',
+  ACT:'T',ACC:'T',ACA:'T',ACG:'T',GCT:'A',GCC:'A',GCA:'A',GCG:'A',
+  TAT:'Y',TAC:'Y',TAA:'*',TAG:'*',TGA:'*',CAT:'H',CAC:'H',CAA:'Q',CAG:'Q',
+  AAT:'N',AAC:'N',AAA:'K',AAG:'K',GAT:'D',GAC:'D',GAA:'E',GAG:'E',
+  TGT:'C',TGC:'C',TGG:'W',CGT:'R',CGC:'R',CGA:'R',CGG:'R',
+  AGT:'S',AGC:'S',AGA:'R',AGG:'R',GGT:'G',GGC:'G',GGA:'G',GGG:'G',
+};
+function translateDNA(dna) {
+  const s = dna.toUpperCase().replace(/[^ATGC]/g,'');
+  let protein = '';
+  for (let i = 0; i + 2 < s.length; i += 3) {
+    const codon = s.slice(i, i + 3);
+    const aa = DNA_TO_AA[codon];
+    if (!aa || aa === '*') break;
+    protein += aa;
   }
-});
+  return protein;
+}
+let inputType = 'protein';
 
-// ── Strategy change: show/hide slider panel
-document.querySelectorAll('input[name="strategy"]').forEach(radio => {
-  radio.addEventListener('change', function() {
-    const panel = document.getElementById('slider-panel');
-    panel.classList.toggle('visible', CT_STRATEGIES.includes(this.value));
+/* ── Input type toggle logic ── */
+document.querySelectorAll('input[name="input-type"]').forEach(r => {
+  r.addEventListener('change', function() {
+    inputType = this.value;
+    const ta = document.getElementById('seq-input');
+    const label = document.getElementById('seq-input-label');
+    const hint = document.getElementById('seq-hint-text');
+    const lenEl = document.getElementById('seq-len');
+    const preview = document.getElementById('translated-preview');
+    ta.value = '';
+    clearError();
+    document.getElementById('results').classList.remove('visible');
+    if (inputType === 'dna') {
+      label.textContent = t('card_dna_input');
+      hint.textContent = t('hint_input_dna');
+      ta.placeholder = 'ATGTCTCCTCAAACTGAAACAAAAGCTTCTGTTGGATTTAAAGCTGGTGT...';
+      lenEl.textContent = '0 nt';
+      preview.classList.remove('visible');
+    } else {
+      label.textContent = t('card_protein');
+      hint.textContent = t('hint_input');
+      ta.placeholder = 'MSPQTETKASVGFKAGVKEYKLTYYTPEYETKDTDILAAFRVTPQPG...';
+      lenEl.textContent = '0 aa';
+      preview.classList.remove('visible');
+    }
   });
 });
 
-// ── Slider value display
-document.getElementById('slider-seqs').addEventListener('input', function() {
-  document.getElementById('val-seqs').textContent = this.value;
-});
-document.getElementById('slider-temp').addEventListener('input', function() {
-  document.getElementById('val-temp').textContent = parseFloat(this.value).toFixed(1);
-});
-
-function cleanProtein(raw) {
-  return raw.trim().toUpperCase().replace(/\s+/g,'');
+async function loadOrganisms() {
+  try { const r = await fetch('/api/organisms'); if(r.ok){allOrganisms=await r.json();renderOrganismDropdown();}} catch(e){}
+  if(!allOrganisms.length){allOrganisms=POPULAR_ORGANISMS.map((n,i)=>({id:i,name:n}));renderOrganismDropdown();}
 }
 
-function validateProtein(seq) {
-  if (!seq || seq.length === 0) return 'Please enter a protein sequence.';
-  const core = seq.replace(/[_*]$/, '');
-  if (core.length < 3) return 'Sequence must be at least 3 amino acids.';
-  if (core.length > 3000) return 'Sequence too long (max 3000 aa).';
-  for (const aa of core) {
-    if (!VALID_AA.has(aa)) return `Invalid amino acid: "${aa}". Use standard single-letter codes.`;
+function renderOrganismDropdown() {
+  const dd = document.getElementById('organism-dropdown');
+  const sv = document.getElementById('organism-search').value.toLowerCase();
+  const filtered = allOrganisms.filter(o => o.name.toLowerCase().includes(sv));
+  const pop = filtered.filter(o => POPULAR_ORGANISMS.includes(o.name));
+  const other = filtered.filter(o => !POPULAR_ORGANISMS.includes(o.name));
+  let h = '';
+  if(pop.length){h+=`<div class="organism-group-label">${t('group_popular')}</div>`;
+    for(const o of pop){const a=o.name===selectedOrganism?' active':'';h+=`<div class="organism-item${a}" onclick="selectOrganism('${o.name.replace(/'/g,"\\'")}')"><em>${o.name}</em></div>`;}}
+  if(other.length){h+=`<div class="organism-group-label">${t('group_all')} (${other.length})</div>`;
+    for(const o of other){const a=o.name===selectedOrganism?' active':'';h+=`<div class="organism-item${a}" onclick="selectOrganism('${o.name.replace(/'/g,"\\'")}')"><em>${o.name}</em></div>`;}}
+  if(!filtered.length) h=`<div class="organism-item" style="color:var(--muted)">No match</div>`;
+  dd.innerHTML = h;
+}
+
+function selectOrganism(name) {
+  selectedOrganism = name;
+  document.getElementById('organism-search').value = name;
+  document.getElementById('organism-dropdown').classList.remove('open');
+  updateOrganismUI();
+}
+
+function updateOrganismUI() {
+  const isChlamy = CHLAMYDOMONAS_ORGANISMS.includes(selectedOrganism);
+  const cp = document.getElementById('pill-chlamyct');
+  if(isChlamy){cp.classList.remove('hidden');}else{cp.classList.add('hidden');
+    if(cp.querySelector('input').checked){document.querySelector('input[name="strategy"][value="cai_max"]').checked=true;document.getElementById('slider-panel').classList.remove('visible');}}
+  const info = document.getElementById('organism-info');
+  if(selectedOrganism){
+    info.innerHTML=`<div class="organism-selected-badge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> <em>${selectedOrganism}</em></div>`;
+  } else { info.innerHTML=''; }
+  if(isChlamy && selectedOrganism.includes('chloroplast')){clientCodonFreq=CHLAMY_CODON_FREQ;}
+  else if(apiAvailable){clientCodonFreq=null;}
+}
+
+const orgSearch = document.getElementById('organism-search');
+const orgDropdown = document.getElementById('organism-dropdown');
+orgSearch.addEventListener('focus',()=>{orgSearch.select();orgDropdown.classList.add('open');renderOrganismDropdown();});
+orgSearch.addEventListener('input',()=>{orgDropdown.classList.add('open');renderOrganismDropdown();});
+document.addEventListener('click',(e)=>{if(!document.getElementById('organism-selector').contains(e.target)){orgDropdown.classList.remove('open');if(!orgSearch.value.trim()&&selectedOrganism)orgSearch.value=selectedOrganism;}});
+
+// ══════════════════════════════════════════════════════════════════
+// Core logic
+// ══════════════════════════════════════════════════════════════════
+const STOP_CODONS=['TAA','TAG','TGA'];
+const VALID_AA=new Set('ACDEFGHIKLMNPQRSTVWY');
+const CT_STRATEGIES=['base_ct','chlamyct'];
+let lastDNA='',lastProtein='',apiAvailable=false;
+
+async function checkAPIHealth(retries=2){
+  const dot=document.getElementById('api-dot'),label=document.getElementById('api-label');
+  dot.classList.remove('online','offline');label.textContent=t('api_checking');
+  for(let i=0;i<=retries;i++){
+    try{const c=new AbortController();setTimeout(()=>c.abort(),8000);
+      const r=await fetch('/api/health',{signal:c.signal});if(r.ok){const d=await r.json();
+      if(d.status==='ok'){apiAvailable=true;dot.classList.remove('offline');dot.classList.add('online');label.textContent=t('api_online');enableCTPills();return;}}}catch(e){}
+    if(i<retries) await new Promise(r=>setTimeout(r,2000));
   }
+  apiAvailable=false;dot.classList.remove('online');dot.classList.add('offline');label.textContent=t('api_offline');disableCTPills();
+}
+function enableCTPills(){document.getElementById('pill-basect').classList.remove('disabled');document.getElementById('pill-basect').querySelector('input').disabled=false;const c=document.getElementById('pill-chlamyct');c.classList.remove('disabled');c.querySelector('input').disabled=false;}
+function disableCTPills(){document.getElementById('pill-basect').classList.add('disabled');document.getElementById('pill-basect').querySelector('input').disabled=true;document.getElementById('pill-chlamyct').classList.add('disabled');document.getElementById('pill-chlamyct').querySelector('input').disabled=true;}
+
+disableCTPills();checkAPIHealth();loadOrganisms();orgSearch.value='';updateOrganismUI();
+
+document.getElementById('seq-input').addEventListener('input',function(){
+  clearError(); document.getElementById('results').classList.remove('visible');
+  if (inputType === 'dna') {
+    const dna = this.value.toUpperCase().replace(/[^ATGC]/g,'');
+    document.getElementById('seq-len').textContent = dna.length + ' nt';
+    const preview = document.getElementById('translated-preview');
+    if (dna.length >= 3) {
+      const protein = translateDNA(dna);
+      document.getElementById('translated-protein-text').textContent = protein + (protein.length ? ' (' + protein.length + ' aa)' : '');
+      preview.classList.add('visible');
+    } else { preview.classList.remove('visible'); }
+  } else {
+    const c = cleanProtein(this.value);
+    document.getElementById('seq-len').textContent = c.replace(/[_*]/g,'').length + ' aa';
+    document.getElementById('translated-preview').classList.remove('visible');
+  }
+});
+document.querySelectorAll('input[name="strategy"]').forEach(r=>{r.addEventListener('change',function(){document.getElementById('slider-panel').classList.toggle('visible',CT_STRATEGIES.includes(this.value));});});
+document.getElementById('slider-seqs').addEventListener('input',function(){document.getElementById('val-seqs').textContent=this.value;});
+document.getElementById('slider-temp').addEventListener('input',function(){document.getElementById('val-temp').textContent=parseFloat(this.value).toFixed(1);});
+document.getElementById('sa-dna-input').addEventListener('input',function(){document.getElementById('sa-seq-len').textContent=this.value.replace(/[^ATGCatgc]/g,'').length+' nt';});
+document.getElementById('pa-protein-input').addEventListener('input',function(){document.getElementById('pa-seq-len').textContent=this.value.trim().toUpperCase().replace(/[^A-Z]/g,'').length+' aa';});
+
+function cleanProtein(r){return r.trim().toUpperCase().replace(/\s+/g,'');}
+function validateProtein(s){if(!s||!s.length)return t('err_empty');const c=s.replace(/[_*]$/,'');if(c.length<3)return t('err_short');if(c.length>3000)return t('err_long');for(const a of c)if(!VALID_AA.has(a))return t('err_invalid_aa',{aa:a});return null;}
+function showError(m){document.getElementById('seq-input').classList.add('error');document.getElementById('err-text').textContent=m;document.getElementById('err-msg').classList.add('visible');}
+function clearError(){document.getElementById('seq-input').classList.remove('error');document.getElementById('err-msg').classList.remove('visible');}
+function sampleCodon(f){const r=Math.random();let c=0;const e=Object.entries(f);for(const[k,v]of e){c+=v;if(r<=c)return k;}return e[e.length-1][0];}
+function optimizeLocal(p,s){if(!clientCodonFreq)return null;let d='';for(const a of p){if(a==='_'||a==='*')break;const f=clientCodonFreq[a];if(!f){d+='NNN';continue;}if(s==='cai_max'){d+=Object.entries(f).sort((a,b)=>b[1]-a[1])[0][0];}else{d+=sampleCodon(f);}}d+='TAA';return d;}
+function calcGC(d){let g=0;for(const b of d)if(b==='G'||b==='C')g++;return g/d.length*100;}
+function calcCSI(d){if(!clientCodonFreq)return 0;const l=[];for(let i=0;i<d.length-3;i+=3){const c=d.slice(i,i+3);let a=null;for(const[k,m]of Object.entries(clientCodonFreq)){if(c in m){a=k;break;}}if(!a||a==='M')continue;const f=clientCodonFreq[a];const mx=Math.max(...Object.values(f));const w=(f[c]||.001)/mx;l.push(Math.log(w));}if(!l.length)return 0;return Math.exp(l.reduce((a,b)=>a+b,0)/l.length);}
+
+async function callAPI(ep,body){const c=new AbortController();const to=setTimeout(()=>c.abort(),120000);const o={method:body?'POST':'GET',headers:{'Content-Type':'application/json'},signal:c.signal};if(body)o.body=JSON.stringify(body);const r=await fetch('/api/'+ep,o);clearTimeout(to);if(!r.ok){const d=await r.text();throw new Error(d);}return r.json();}
+
+function validateDNAInput(dna) {
+  if (!dna || !dna.length) return t('err_dna_empty');
+  if (dna.length < 9) return t('err_dna_short');
+  if (dna.length > 9000) return t('err_dna_long_opt');
+  if (/[^ATGC]/i.test(dna)) return t('err_dna_invalid');
+  if (dna.length % 3 !== 0) return t('err_dna_not_triplet');
   return null;
 }
-
-function showError(msg) {
-  document.getElementById('seq-input').classList.add('error');
-  document.getElementById('err-text').textContent = msg;
-  document.getElementById('err-msg').classList.add('visible');
+async function runOptimization(){clearError();const raw=document.getElementById('seq-input').value;
+let protein;
+if (inputType === 'dna') {
+  const dna = raw.toUpperCase().replace(/\s+/g,'').replace(/[^ATGC]/g,'');
+  const dnaErr = validateDNAInput(dna);
+  if (dnaErr) { showError(dnaErr); return; }
+  protein = translateDNA(dna) + '_';
+} else {
+  protein = cleanProtein(raw);
 }
-function clearError() {
-  document.getElementById('seq-input').classList.remove('error');
-  document.getElementById('err-msg').classList.remove('visible');
+const err=validateProtein(protein);if(err){showError(err);return;}
+if(!selectedOrganism){showError(currentLang==='ja'?'対象生物種を選択してください。':'Please select a target organism.');return;}
+const strategy=document.querySelector('input[name="strategy"]:checked').value;const btn=document.getElementById('run-btn');btn.disabled=true;
+const isCT=CT_STRATEGIES.includes(strategy);const core=protein.replace(/[_*]$/,'');const proteinWithStop=core+'_';const needsAPI=isCT||!clientCodonFreq;
+if(needsAPI&&!apiAvailable){showError(t('err_api')+'API offline.');btn.disabled=false;return;}
+if(needsAPI){btn.innerHTML='<span class="spinner"></span> '+t(isCT?'btn_generating':'btn_optimizing');
+  try{const body={protein:proteinWithStop,strategy,organism:selectedOrganism};if(isCT){body.num_sequences=parseInt(document.getElementById('slider-seqs').value);body.temperature=parseFloat(document.getElementById('slider-temp').value);}
+  const result=await callAPI('predict',body);lastDNA=result.predicted_dna;lastProtein=core;showResults(lastDNA,core,strategy);fetchExtendedMetrics(lastDNA);
+  saveHistory('optimize',{organism:selectedOrganism,strategy,proteinInput:proteinWithStop,dnaOutput:lastDNA,gcPercent:calcGC(lastDNA),csi:calcCSI(lastDNA),lengthNt:lastDNA.length,lengthAa:core.length,startCodon:lastDNA.slice(0,3),stopCodon:lastDNA.slice(-3)});}catch(e){showError(t('err_api')+(e.message||'Unknown'));}finally{resetButton();}}
+else{btn.innerHTML='<span class="spinner"></span> '+t('btn_optimizing');setTimeout(()=>{try{const dna=optimizeLocal(core,strategy);lastDNA=dna;lastProtein=core;showResults(dna,core,strategy);if(apiAvailable)fetchExtendedMetrics(dna);
+  saveHistory('optimize',{organism:selectedOrganism,strategy,proteinInput:core+'_',dnaOutput:dna,gcPercent:calcGC(dna),csi:calcCSI(dna),lengthNt:dna.length,lengthAa:core.length,startCodon:dna.slice(0,3),stopCodon:dna.slice(-3)});}finally{resetButton();}},30);}}
+
+function resetButton(){const btn=document.getElementById('run-btn');btn.disabled=false;btn.innerHTML='<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg> <span data-i18n="btn_optimize">'+t('btn_optimize')+'</span>';}
+
+async function fetchExtendedMetrics(dna){try{const r=await callAPI('evaluate',{dna_sequence:dna,organism:selectedOrganism});showExtendedMetrics(r);}catch(e){}}
+
+function showResults(dna,protein,strategy){const gc=calcGC(dna);const csi=calcCSI(dna);const ntLen=dna.length;const aaLen=protein.length;const start=dna.slice(0,3);const stop=dna.slice(-3);
+document.getElementById('m-gc').textContent=gc.toFixed(1)+'%';const gcPct=Math.min(gc/70*100,100);const gcBar=document.getElementById('m-gc-bar');gcBar.style.width=gcPct+'%';gcBar.className='metric-bar-fill'+(gc>55?' bad':gc>42?' warn':'');
+document.getElementById('m-len').textContent=ntLen+' nt';document.getElementById('m-len-sub').textContent=aaLen+' aa · '+(ntLen/3|0)+' codons';
+document.getElementById('m-csi').textContent=csi.toFixed(3);document.getElementById('m-csi-bar').style.width=(csi*100)+'%';
+document.getElementById('m-startstop').textContent=start+' / '+stop;const ok=(start==='ATG'||start==='GTG')&&STOP_CODONS.includes(stop);document.getElementById('m-startstop-sub').textContent=ok?t('metric_startstop_valid'):t('metric_startstop_check');document.getElementById('m-startstop-sub').style.color=ok?'var(--green)':'var(--amber)';
+hideExtendedMetrics();
+const codons=[];for(let i=0;i<dna.length;i+=3)codons.push(dna.slice(i,i+3));document.getElementById('dna-colored').innerHTML=codons.map(c=>`<span class="codon">${c}</span>`).join('');
+document.getElementById('results').classList.add('visible');document.getElementById('results').scrollIntoView({behavior:'smooth',block:'nearest'});}
+
+function showExtendedMetrics(r){if(r.csi!==undefined){document.getElementById('m-csi').textContent=r.csi.toFixed(3);document.getElementById('m-csi-bar').style.width=(r.csi*100)+'%';}
+if(r.gc_percent!==undefined){document.getElementById('m-gc').textContent=r.gc_percent.toFixed(1)+'%';const p=Math.min(r.gc_percent/70*100,100);const b=document.getElementById('m-gc-bar');b.style.width=p+'%';b.className='metric-bar-fill'+(r.gc_percent>55?' bad':r.gc_percent>42?' warn':'');}
+showMetricBox('box-cfd');document.getElementById('m-cfd').textContent=r.cfd.toFixed(3);document.getElementById('m-cfd-bar').style.width=(r.cfd*100)+'%';
+showMetricBox('box-minmax');document.getElementById('m-minmax').textContent=r.minmax_mean.toFixed(1);document.getElementById('m-minmax-bar').style.width=Math.min(r.minmax_mean,100)+'%';
+showMetricBox('box-cis');const c=document.getElementById('m-cis');c.textContent=r.cis_elements;c.style.color=r.cis_elements===0?'var(--green)':r.cis_elements<=2?'var(--amber)':'var(--red)';
+showMetricBox('box-mfe');document.getElementById('m-mfe').textContent=r.mfe!==null?r.mfe.toFixed(1):'N/A';
+showMetricBox('box-complexity');document.getElementById('m-complexity').textContent=r.complexity.toFixed(3);document.getElementById('m-complexity-bar').style.width=(r.complexity*100)+'%';}
+function showMetricBox(id){document.getElementById(id).style.display='';}
+function hideExtendedMetrics(){['box-cfd','box-minmax','box-cis','box-mfe','box-complexity'].forEach(id=>document.getElementById(id).style.display='none');}
+
+function copyDNA(){navigator.clipboard.writeText(lastDNA).then(()=>{const b=document.querySelector('.copy-btn');b.textContent=t('btn_copied');setTimeout(()=>b.textContent=t('btn_copy'),1500);});}
+function downloadFasta(){if(!lastDNA)return;const h=`>CodonDesign|${document.querySelector('input[name="strategy"]:checked').value}|${selectedOrganism}|${lastProtein.length}aa`;const s=lastDNA.match(/.{1,60}/g).join('\n');triggerDownload(new Blob([h+'\n'+s+'\n'],{type:'text/plain'}),'codondesign.fasta');}
+function downloadCSV(){if(!lastDNA)return;const s=document.querySelector('input[name="strategy"]:checked').value;const rows=['strategy,organism,dna,protein,gc_percent,csi,length_nt,length_aa',`${s},"${selectedOrganism}",${lastDNA},${lastProtein}_,${calcGC(lastDNA).toFixed(2)},${calcCSI(lastDNA).toFixed(4)},${lastDNA.length},${lastProtein.length}`];triggerDownload(new Blob([rows.join('\n')+'\n'],{type:'text/csv'}),'codondesign.csv');}
+function triggerDownload(b,n){const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=n;a.click();URL.revokeObjectURL(u);}
+
+// ══════════════════════════════════════════════════════════════════
+// Restriction Enzyme Analysis
+// ══════════════════════════════════════════════════════════════════
+const ENZYME_SETS={common:null,golden_gate:['BsaI','BbsI','BpiI','Esp3I','SapI','BsmBI'],gibson:['EcoRI','BamHI','HindIII','XbaI','SalI','PstI','SphI','KpnI','NcoI','NdeI','XhoI','NotI','BglII','NheI','SpeI','MluI']};
+const RE_SITES={EcoRI:'GAATTC',BamHI:'GGATCC',HindIII:'AAGCTT',XbaI:'TCTAGA',SalI:'GTCGAC',PstI:'CTGCAG',SphI:'GCATGC',KpnI:'GGTACC',NcoI:'CCATGG',NdeI:'CATATG',XhoI:'CTCGAG',NotI:'GCGGCCGC',BglII:'AGATCT',ClaI:'ATCGAT',EcoRV:'GATATC',SacI:'GAGCTC',NheI:'GCTAGC',SpeI:'ACTAGT',MluI:'ACGCGT',SmaI:'CCCGGG',BsaI:'GGTCTC',BbsI:'GAAGAC',SapI:'GCTCTTC'};
+
+async function runRestriction(){const dna=document.getElementById('sa-dna-input').value.trim().toUpperCase().replace(/[^ATGC]/g,'');const eE=document.getElementById('re-err-msg'),eT=document.getElementById('re-err-text');eE.classList.remove('visible');
+if(!dna){eT.textContent=t('err_dna_empty');eE.classList.add('visible');return;}
+if(!apiAvailable){runRestrictionLocal(dna);return;}
+const btn=document.getElementById('re-run-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> '+t('re_run_btn');
+try{const es=document.getElementById('re-enzyme-set').value;const body={dna_sequence:dna};if(ENZYME_SETS[es])body.enzymes=ENZYME_SETS[es];const r=await callAPI('restriction',body);displayRestrictionResults(r);}catch(e){runRestrictionLocal(dna);}
+finally{btn.disabled=false;btn.innerHTML='<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg> <span data-i18n="re_run_btn">'+t('re_run_btn')+'</span>';}}
+
+function runRestrictionLocal(dna){const es=document.getElementById('re-enzyme-set').value;let ec=RE_SITES;if(es==='golden_gate')ec={BsaI:'GGTCTC',BbsI:'GAAGAC',SapI:'GCTCTTC'};else if(es==='gibson'){ec={};for(const e of ENZYME_SETS.gibson)if(RE_SITES[e])ec[e]=RE_SITES[e];}
+const results=[];let total=0;for(const[n,site]of Object.entries(ec)){const pos=[];let i=dna.indexOf(site);while(i!==-1){pos.push(i+1);i=dna.indexOf(site,i+1);}const rc=reverseComplement(site);if(rc!==site){i=dna.indexOf(rc);while(i!==-1){pos.push(i+1);i=dna.indexOf(rc,i+1);}}pos.sort((a,b)=>a-b);if(pos.length){total+=pos.length;const frags=[];let prev=0;for(const p of pos){frags.push(p-prev);prev=p;}frags.push(dna.length-prev);results.push({enzyme:n,recognition_site:site,cut_positions:pos,num_cuts:pos.length,fragment_sizes:frags});}}
+results.sort((a,b)=>b.num_cuts-a.num_cuts);displayRestrictionResults({total_enzymes_checked:Object.keys(ec).length,total_sites_found:total,length_nt:dna.length,enzymes:results});}
+
+function reverseComplement(s){const c={A:'T',T:'A',G:'C',C:'G'};return s.split('').reverse().map(b=>c[b]||b).join('');}
+
+function displayRestrictionResults(r){const c=document.getElementById('re-results');c.style.display='block';const uc=r.enzymes.filter(e=>e.num_cuts===1).length;
+  const dnaVal=document.getElementById('sa-dna-input').value.trim().toUpperCase().replace(/[^ATGC]/g,'');
+  saveHistory('restriction',{dnaInput:dnaVal.slice(0,2000),lengthNt:r.length_nt,totalSites:r.total_sites_found,enzymesChecked:r.total_enzymes_checked,uniqueCutters:uc});
+let h=`<div class="re-summary" style="margin-top:16px"><div class="re-summary-item"><div class="re-summary-value">${r.total_enzymes_checked}</div><div class="re-summary-label">${t('re_summary_enzymes')}</div></div><div class="re-summary-item"><div class="re-summary-value">${r.total_sites_found}</div><div class="re-summary-label">${t('re_summary_sites')}</div></div><div class="re-summary-item"><div class="re-summary-value">${uc}</div><div class="re-summary-label">${t('re_summary_unique')}</div></div></div>`;
+if(!r.enzymes.length){h+=`<p style="color:var(--green);font-weight:600;font-size:.88rem">${t('re_no_sites')}</p>`;}
+else{h+='<div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border-lt)"><table class="re-table"><thead><tr><th>'+t('re_col_enzyme')+'</th><th>'+t('re_col_site')+'</th><th>'+t('re_col_cuts')+'</th><th>'+t('re_col_positions')+'</th><th>'+t('re_col_fragments')+'</th></tr></thead><tbody>';
+for(const e of r.enzymes){const bc=e.num_cuts===1?'none':e.num_cuts<=3?'some':'many';h+=`<tr><td><strong>${e.enzyme}</strong></td><td style="font-family:monospace;font-size:.75rem;letter-spacing:.5px">${e.recognition_site}</td><td><span class="re-badge ${bc}">${e.num_cuts}</span></td><td style="font-size:.75rem">${e.cut_positions.join(', ')}</td><td style="font-size:.75rem">${e.fragment_sizes.join(', ')}</td></tr>`;}
+h+='</tbody></table></div>';}c.innerHTML=h;}
+
+// ══════════════════════════════════════════════════════════════════
+// RNA Structure
+// ══════════════════════════════════════════════════════════════════
+
+// Nussinov algorithm for RNA secondary structure prediction
+function nussinovFold(rnaSeq) {
+  const n = rnaSeq.length;
+  if (n === 0) return '';
+  // For long sequences, use windowed approach
+  if (n > 800) return nussinovWindowed(rnaSeq, 400, 100);
+  return nussinovCore(rnaSeq);
 }
 
-// ── Client-side optimization (fallback for cai_max and bfc)
-function sampleCodon(freqs) {
-  const r = Math.random();
-  let cum = 0;
-  const entries = Object.entries(freqs);
-  for (const [codon, freq] of entries) {
-    cum += freq;
-    if (r <= cum) return codon;
+function canPair(a, b) {
+  const p = a + b;
+  return p === 'AU' || p === 'UA' || p === 'GC' || p === 'CG' || p === 'GU' || p === 'UG';
+}
+
+function nussinovCore(rnaSeq) {
+  const n = rnaSeq.length;
+  const MIN_LOOP = 3;
+  // DP matrix
+  const dp = new Array(n);
+  for (let i = 0; i < n; i++) { dp[i] = new Int16Array(n); }
+  // Fill DP table
+  for (let span = MIN_LOOP + 1; span < n; span++) {
+    for (let i = 0; i < n - span; i++) {
+      const j = i + span;
+      // case 1: j unpaired
+      dp[i][j] = dp[i][j-1];
+      // case 2: i unpaired
+      if (dp[i+1][j] > dp[i][j]) dp[i][j] = dp[i+1][j];
+      // case 3: i,j paired
+      if (canPair(rnaSeq[i], rnaSeq[j])) {
+        const v = (i+1 <= j-1 ? dp[i+1][j-1] : 0) + 1;
+        if (v > dp[i][j]) dp[i][j] = v;
+      }
+      // case 4: bifurcation
+      for (let k = i + 1; k < j; k++) {
+        const v = dp[i][k] + dp[k+1][j];
+        if (v > dp[i][j]) dp[i][j] = v;
+      }
+    }
   }
-  return entries[entries.length - 1][0];
-}
-
-function optimizeLocal(protein, strategy) {
-  let dna = '';
-  for (const aa of protein) {
-    if (aa === '_' || aa === '*') break;
-    const freqs = CODON_FREQ[aa];
-    if (!freqs) { dna += 'NNN'; continue; }
-    if (strategy === 'cai_max') {
-      const best = Object.entries(freqs).sort((a,b) => b[1]-a[1])[0][0];
-      dna += best;
+  // Traceback
+  const structure = new Array(n).fill('.');
+  const stack = [[0, n - 1]];
+  while (stack.length > 0) {
+    const [i, j] = stack.pop();
+    if (i >= j || j - i <= MIN_LOOP) continue;
+    if (dp[i][j] === dp[i][j-1]) {
+      stack.push([i, j-1]);
+    } else if (dp[i][j] === dp[i+1][j]) {
+      stack.push([i+1, j]);
+    } else if (canPair(rnaSeq[i], rnaSeq[j]) && dp[i][j] === (i+1 <= j-1 ? dp[i+1][j-1] : 0) + 1) {
+      structure[i] = '(';
+      structure[j] = ')';
+      if (i+1 <= j-1) stack.push([i+1, j-1]);
     } else {
-      dna += sampleCodon(freqs);
+      // bifurcation
+      for (let k = i + 1; k < j; k++) {
+        if (dp[i][j] === dp[i][k] + dp[k+1][j]) {
+          stack.push([i, k]);
+          stack.push([k+1, j]);
+          break;
+        }
+      }
     }
   }
-  dna += 'TAA';
-  return dna;
+  return structure.join('');
 }
 
-// ── Client-side metrics
-function calcGC(dna) {
-  let gc = 0;
-  for (const b of dna) if (b === 'G' || b === 'C') gc++;
-  return gc / dna.length * 100;
-}
-
-function calcCSI(dna) {
-  const logW = [];
-  for (let i = 0; i < dna.length - 3; i += 3) {
-    const codon = dna.slice(i, i+3);
-    let aa = null;
-    for (const [a, cmap] of Object.entries(CODON_FREQ)) {
-      if (codon in cmap) { aa = a; break; }
+function nussinovWindowed(rnaSeq, windowSize, overlap) {
+  const n = rnaSeq.length;
+  const structure = new Array(n).fill('.');
+  const step = windowSize - overlap;
+  for (let start = 0; start < n; start += step) {
+    const end = Math.min(start + windowSize, n);
+    const windowSeq = rnaSeq.slice(start, end);
+    const windowStr = nussinovCore(windowSeq);
+    // Only apply the non-overlapping portion (except first window)
+    const applyFrom = (start === 0) ? 0 : Math.floor(overlap / 2);
+    const applyTo = (end === n) ? windowStr.length : windowStr.length - Math.floor(overlap / 2);
+    for (let i = applyFrom; i < applyTo; i++) {
+      if (windowStr[i] !== '.') {
+        structure[start + i] = windowStr[i];
+      }
     }
-    if (!aa || aa === 'M') continue;
-    const freqs = CODON_FREQ[aa];
-    const maxFreq = Math.max(...Object.values(freqs));
-    const w = (freqs[codon] || 0.001) / maxFreq;
-    logW.push(Math.log(w));
+    if (end === n) break;
   }
-  if (!logW.length) return 0;
-  return Math.exp(logW.reduce((a,b) => a+b, 0) / logW.length);
+  // Validate: ensure brackets are balanced
+  let depth = 0;
+  for (let i = 0; i < n; i++) {
+    if (structure[i] === '(') depth++;
+    else if (structure[i] === ')') {
+      if (depth <= 0) structure[i] = '.';
+      else depth--;
+    }
+  }
+  // Remove unmatched open brackets from the end
+  for (let i = n - 1; i >= 0 && depth > 0; i--) {
+    if (structure[i] === '(') { structure[i] = '.'; depth--; }
+  }
+  return structure.join('');
 }
 
-// ── API helper
-async function callAPI(endpoint, body) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000);
-  const opts = {
-    method: body ? 'POST' : 'GET',
-    headers: { 'Content-Type': 'application/json' },
-    signal: controller.signal,
-  };
-  if (body) opts.body = JSON.stringify(body);
-  const resp = await fetch('/api/' + endpoint, opts);
-  clearTimeout(timeout);
-  if (!resp.ok) {
-    const detail = await resp.text();
-    throw new Error(detail);
+// Calculate MFE from predicted base pairs
+function calcMFEFromPairs(rnaSeq, structure) {
+  let mfe = 0;
+  const stack = [];
+  for (let i = 0; i < structure.length; i++) {
+    if (structure[i] === '(') {
+      stack.push(i);
+    } else if (structure[i] === ')') {
+      if (stack.length > 0) {
+        const j = stack.pop();
+        const pair = rnaSeq[j] + rnaSeq[i];
+        if (pair === 'GC' || pair === 'CG') mfe += -3.0;
+        else if (pair === 'AU' || pair === 'UA') mfe += -2.0;
+        else if (pair === 'GU' || pair === 'UG') mfe += -1.0;
+      }
+    }
   }
-  return resp.json();
+  return mfe;
 }
 
-// ── Main optimization
-async function runOptimization() {
-  clearError();
-  const raw = document.getElementById('seq-input').value;
-  const protein = cleanProtein(raw);
-  const err = validateProtein(protein);
-  if (err) { showError(err); return; }
+// Count base pairs from structure
+function countBasePairs(structure) {
+  let count = 0;
+  for (const c of structure) { if (c === '(') count++; }
+  return count;
+}
 
-  const strategy = document.querySelector('input[name="strategy"]:checked').value;
-  const btn = document.getElementById('run-btn');
-  btn.disabled = true;
+// Store current RNA results and state for toggling
+let rnaCurrentResults = null;
+let rnaCurrentMode = 'mfe'; // 'mfe' or 'centroid'
+let rna2dColorMode = 'base'; // 'base', 'pos', 'pair'
+let rna2dZoom = 1;
+let rna2dPanX = 0, rna2dPanY = 0;
+let rna2dDragging = false, rna2dDragStartX = 0, rna2dDragStartY = 0;
 
-  const isCT = CT_STRATEGIES.includes(strategy);
-  const core = protein.replace(/[_*]$/, '');
-  const proteinWithStop = core + '_';
-
-  if (isCT) {
-    // API-based prediction
-    btn.innerHTML = '<span class="spinner"></span> Generating with AI model...';
-    const numSeqs = parseInt(document.getElementById('slider-seqs').value);
-    const temp = parseFloat(document.getElementById('slider-temp').value);
-    try {
-      const result = await callAPI('predict', {
-        protein: proteinWithStop,
-        strategy: strategy,
-        num_sequences: numSeqs,
-        temperature: temp,
+async function runRNAStructure() {
+  let dna = document.getElementById('sa-dna-input').value.trim().toUpperCase().replace(/[^ATGC]/g, '');
+  const eE = document.getElementById('rna-err-msg'), eT = document.getElementById('rna-err-text');
+  eE.classList.remove('visible');
+  if (!dna) { eT.textContent = t('err_dna_empty'); eE.classList.add('visible'); return; }
+  // Prepend 5' UTR if provided
+  const utrInput = document.getElementById('rna-utr-input').value.trim().toUpperCase().replace(/[^ATGC]/g, '');
+  if (utrInput) dna = utrInput + dna;
+  const btn = document.getElementById('rna-run-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> ' + t('rna_run_btn');
+  const region = document.getElementById('rna-region').value;
+  try {
+    if (apiAvailable) {
+      const r = await callAPI('rna-structure', { dna_sequence: dna, region });
+      r._source = r.source || 'vienna';
+      displayRNAResults(r);
+    } else {
+      let seq = dna, rl = 'full';
+      if (region === '5utr') { seq = dna.slice(0, 100); rl = "5' UTR"; }
+      if (region === '3utr') { seq = dna.slice(-100); rl = "3' UTR"; }
+      const rna = seq.replace(/T/g, 'U');
+      const gc = (seq.match(/[GC]/g) || []).length / seq.length * 100;
+      const structure = nussinovFold(rna);
+      const mfe = calcMFEFromPairs(rna, structure);
+      const bpCount = countBasePairs(structure);
+      displayRNAResults({
+        sequence: rna, structure: structure, mfe: mfe,
+        length_nt: rna.length, gc_percent: gc, base_pair_count: bpCount,
+        region: rl, _source: 'nussinov'
       });
-      lastDNA = result.predicted_dna;
-      lastProtein = core;
-      showResults(lastDNA, core, strategy);
-      // Fetch extended metrics
-      fetchExtendedMetrics(lastDNA);
-    } catch (e) {
-      showError('API error: ' + (e.message || 'Unknown error'));
-    } finally {
-      resetButton();
+    }
+  } catch (e) {
+    // Fallback to Nussinov on API error
+    try {
+      let seq = dna, rl = 'full';
+      if (region === '5utr') { seq = dna.slice(0, 100); rl = "5' UTR"; }
+      if (region === '3utr') { seq = dna.slice(-100); rl = "3' UTR"; }
+      const rna = seq.replace(/T/g, 'U');
+      const gc = (seq.match(/[GC]/g) || []).length / seq.length * 100;
+      const structure = nussinovFold(rna);
+      const mfe = calcMFEFromPairs(rna, structure);
+      const bpCount = countBasePairs(structure);
+      displayRNAResults({
+        sequence: rna, structure: structure, mfe: mfe,
+        length_nt: rna.length, gc_percent: gc, base_pair_count: bpCount,
+        region: rl + ' (fallback)', _source: 'nussinov'
+      });
+    } catch (e2) {
+      eT.textContent = t('err_api') + (e.message || ''); eE.classList.add('visible');
+    }
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg> <span data-i18n="rna_run_btn">' + t('rna_run_btn') + '</span>';
+  }
+}
+
+function displayRNAResults(r) {
+  const c = document.getElementById('rna-results');
+  c.style.display = 'block';
+  rnaCurrentResults = r;
+  rnaCurrentMode = 'mfe';
+  const dnaVal = document.getElementById('sa-dna-input').value.trim().toUpperCase().replace(/[^ATGC]/g, '');
+  saveHistory('rna', { dnaInput: dnaVal.slice(0, 2000), lengthNt: r.length_nt, mfe: r.mfe, gcPercent: r.gc_percent, basePairCount: r.base_pair_count, region: r.region });
+
+  const isVienna = r._source === 'vienna';
+  const ensembleEnergy = r.ensemble_energy != null ? r.ensemble_energy.toFixed(1) : '--';
+  const ensembleDiversity = r.ensemble_diversity != null ? r.ensemble_diversity.toFixed(2) : '--';
+
+  let h = '';
+  // Metrics grid
+  h += `<div class="rna-info-grid" style="margin-top:16px">
+    <div class="rna-info-box"><div class="rna-info-value">${r.mfe.toFixed(1)}</div><div class="rna-info-label">${t('rna_mfe')} (kcal/mol)</div></div>
+    <div class="rna-info-box"><div class="rna-info-value">${r.base_pair_count}</div><div class="rna-info-label">${t('rna_pairs')}</div></div>
+    <div class="rna-info-box"><div class="rna-info-value">${ensembleEnergy}</div><div class="rna-info-label">${t('rna_ensemble_energy')}</div></div>
+    <div class="rna-info-box"><div class="rna-info-value">${ensembleDiversity}</div><div class="rna-info-label">${t('rna_ensemble_diversity')}</div></div>
+  </div>`;
+
+  // Badge + toggle row
+  h += `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">`;
+  if (isVienna) {
+    h += `<span class="rna-badge vienna"><svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="#22c55e"/></svg>${t('rna_badge_vienna')}</span>`;
+  } else {
+    h += `<span class="rna-badge nussinov"><svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="#7c3aed"/></svg>${t('rna_badge_nussinov')}</span>`;
+  }
+  // MFE/Centroid toggle
+  h += `<div class="rna-toggle-group">`;
+  h += `<button class="active" onclick="switchRNAMode('mfe')">MFE</button>`;
+  if (isVienna && r.centroid_structure) {
+    h += `<button onclick="switchRNAMode('centroid')">Centroid</button>`;
+  } else {
+    h += `<button disabled style="opacity:.4;cursor:default">Centroid</button>`;
+  }
+  h += `</div>`;
+  h += `<span style="font-size:.75rem;color:var(--muted)"><strong>${t('rna_region')}:</strong> ${r.region}</span>`;
+  h += `</div>`;
+
+  // Dot-bracket notation
+  h += `<div style="font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Dot-Bracket Notation</div>`;
+  h += `<div class="rna-structure-display" id="rna-dotbracket">${colorDotBracket(r.sequence, r.structure)}</div>`;
+
+  // 2D Structure diagram
+  h += `<div style="font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:16px;margin-bottom:4px">${t('rna_2d_title')}</div>`;
+  h += `<div class="rna-2d-container" id="rna-2d-container">
+    <div class="rna-2d-controls">
+      <button onclick="rna2dSetColor('base')" class="active" id="rna-color-base">${t('rna_color_base')}</button>
+      <button onclick="rna2dSetColor('pos')" id="rna-color-pos">${t('rna_color_pos')}</button>
+      <button onclick="rna2dSetColor('pair')" id="rna-color-pair">${t('rna_color_pair')}</button>
+      <button onclick="rna2dZoomIn()">+</button>
+      <button onclick="rna2dZoomOut()">&minus;</button>
+      <button onclick="rna2dReset()">Reset</button>
+    </div>
+    <svg id="rna-2d-svg"></svg>
+  </div>`;
+  h += `<div class="rna-legend" id="rna-legend">
+    <span class="rna-legend-item"><span class="rna-legend-dot" style="background:#ef4444"></span>A</span>
+    <span class="rna-legend-item"><span class="rna-legend-dot" style="background:#3b82f6"></span>U</span>
+    <span class="rna-legend-item"><span class="rna-legend-dot" style="background:#22c55e"></span>G</span>
+    <span class="rna-legend-item"><span class="rna-legend-dot" style="background:#f59e0b"></span>C</span>
+    <span style="margin-left:auto;font-size:.68rem;color:var(--muted)">${t('rna_zoom_hint')}</span>
+  </div>`;
+
+  // Mountain plot
+  h += `<div style="font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:16px;margin-bottom:4px">${t('rna_mountain_title')}</div>`;
+  h += `<div class="rna-mountain-container" id="rna-mountain-container"><svg id="rna-mountain-svg"></svg></div>`;
+  // Legend for mountain plot
+  if (isVienna) {
+    h += `<div style="display:flex;justify-content:center;gap:18px;margin-top:6px;font-size:.68rem">`;
+    h += `<span style="display:flex;align-items:center;gap:4px"><span style="width:14px;height:3px;background:#ef4444;display:inline-block;border-radius:2px"></span>${t('rna_mountain_mfe')}</span>`;
+    if (r.mountain_pf) h += `<span style="display:flex;align-items:center;gap:4px"><span style="width:14px;height:3px;background:#22c55e;display:inline-block;border-radius:2px"></span>${t('rna_mountain_pf')}</span>`;
+    if (r.mountain_centroid) h += `<span style="display:flex;align-items:center;gap:4px"><span style="width:14px;height:3px;background:#3b82f6;display:inline-block;border-radius:2px"></span>${t('rna_mountain_centroid')}</span>`;
+    h += `</div>`;
+  }
+
+  // Positional entropy
+  if (r.positional_entropy && r.positional_entropy.length > 0) {
+    h += `<div style="font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:20px;margin-bottom:4px">${t('rna_entropy_title')}</div>`;
+    h += `<div class="rna-mountain-container" id="rna-entropy-container"><svg id="rna-entropy-svg"></svg></div>`;
+  }
+
+  c.innerHTML = h;
+
+  // Draw visualizations
+  drawRNA2D(document.getElementById('rna-2d-svg'), r.sequence, r.structure, r.layout_x, r.layout_y);
+  drawMountainPlot(document.getElementById('rna-mountain-svg'), r.structure, r.mountain_mfe, r.mountain_pf, r.mountain_centroid);
+  if (r.positional_entropy && r.positional_entropy.length > 0) {
+    drawEntropyPlot(document.getElementById('rna-entropy-svg'), r.positional_entropy);
+  }
+  setup2DInteraction();
+}
+
+function switchRNAMode(mode) {
+  if (!rnaCurrentResults) return;
+  const r = rnaCurrentResults;
+  rnaCurrentMode = mode;
+  // Update toggle buttons
+  const btns = document.querySelectorAll('.rna-toggle-group button');
+  btns.forEach(b => b.classList.remove('active'));
+  if (mode === 'mfe') btns[0].classList.add('active');
+  else if (btns[1]) btns[1].classList.add('active');
+  const struct = mode === 'centroid' && r.centroid_structure ? r.centroid_structure : r.structure;
+  const seq = r.sequence;
+  const lx = mode === 'centroid' && r.layout_centroid_x ? r.layout_centroid_x : r.layout_x;
+  const ly = mode === 'centroid' && r.layout_centroid_y ? r.layout_centroid_y : r.layout_y;
+  // Update dot-bracket
+  document.getElementById('rna-dotbracket').innerHTML = colorDotBracket(seq, struct);
+  // Redraw 2D
+  drawRNA2D(document.getElementById('rna-2d-svg'), seq, struct, lx, ly);
+  drawMountainPlot(document.getElementById('rna-mountain-svg'), struct, r.mountain_mfe, r.mountain_pf, r.mountain_centroid);
+  setup2DInteraction();
+}
+
+function colorDotBracket(seq, str) {
+  const ll = 60; let h = '';
+  for (let i = 0; i < seq.length; i += ll) {
+    const sl = seq.slice(i, i + ll);
+    const stl = str.slice(i, i + ll);
+    h += `<span style="color:#64748b">${String(i + 1).padStart(5)}</span>  ${sl}\n<span style="color:#64748b">     </span>  `;
+    for (const c of stl) {
+      if (c === '(') h += `<span style="color:#34d399">${c}</span>`;
+      else if (c === ')') h += `<span style="color:#60a5fa">${c}</span>`;
+      else h += `<span style="color:#475569">${c}</span>`;
+    }
+    h += '\n\n';
+  }
+  return h;
+}
+
+// ── 2D Structure Diagram (NAView planar layout if available, else circular) ──
+function drawRNA2D(svgEl, rnaSeq, structure, layoutX, layoutY) {
+  const n = rnaSeq.length;
+  if (n === 0) return;
+  rna2dZoom = 1; rna2dPanX = 0; rna2dPanY = 0;
+  rna2dColorMode = 'base';
+
+  // Parse pairs
+  const pairs = new Array(n).fill(-1);
+  const stack = [];
+  for (let i = 0; i < n; i++) {
+    if (structure[i] === '(') stack.push(i);
+    else if (structure[i] === ')' && stack.length > 0) {
+      const j = stack.pop();
+      pairs[j] = i; pairs[i] = j;
+    }
+  }
+
+  const svgW = svgEl.parentElement ? svgEl.parentElement.clientWidth : 600;
+  const svgH = svgEl.parentElement ? svgEl.parentElement.clientHeight : 500;
+  const positions = [];
+
+  // ViennaRNA naview_xy_coordinates may return n or n+1 points; accept either
+  const hasServerLayout = Array.isArray(layoutX) && Array.isArray(layoutY) && layoutX.length >= n && layoutY.length >= n;
+
+  if (hasServerLayout) {
+    // Use NAView planar coordinates from backend, fit to SVG viewport (flip Y for SVG)
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < n; i++) {
+      if (layoutX[i] < minX) minX = layoutX[i];
+      if (layoutX[i] > maxX) maxX = layoutX[i];
+      if (layoutY[i] < minY) minY = layoutY[i];
+      if (layoutY[i] > maxY) maxY = layoutY[i];
+    }
+    const w = Math.max(1e-6, maxX - minX);
+    const h = Math.max(1e-6, maxY - minY);
+    const padding = 40;
+    const scale = Math.min((svgW - 2 * padding) / w, (svgH - 2 * padding) / h);
+    const plotW = w * scale, plotH = h * scale;
+    const offX = (svgW - plotW) / 2;
+    const offY = (svgH - plotH) / 2;
+    for (let i = 0; i < n; i++) {
+      const x = offX + (layoutX[i] - minX) * scale;
+      // Flip Y so NAView math-convention becomes SVG convention
+      const y = offY + (maxY - layoutY[i]) * scale;
+      positions.push({ x, y });
     }
   } else {
-    // Client-side prediction
-    btn.innerHTML = '<span class="spinner"></span> Optimizing...';
-    setTimeout(() => {
-      try {
-        const dna = optimizeLocal(core, strategy);
-        lastDNA = dna;
-        lastProtein = core;
-        showResults(dna, core, strategy);
-        // Optionally fetch extended metrics from API
-        if (apiAvailable) fetchExtendedMetrics(dna);
-      } finally {
-        resetButton();
+    // Fallback: circular layout
+    const cx = svgW / 2, cy = svgH / 2;
+    const radius = Math.min(svgW, svgH) * 0.38;
+    for (let i = 0; i < n; i++) {
+      const angle = (2 * Math.PI * i / n) - Math.PI / 2;
+      positions.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) });
+    }
+  }
+
+  // Build SVG content
+  const BASE_COLORS = { A: '#ef4444', U: '#3b82f6', G: '#22c55e', C: '#f59e0b' };
+  let svg = `<g id="rna-2d-group">`;
+
+  // Draw base pair lines
+  for (let i = 0; i < n; i++) {
+    if (pairs[i] > i) {
+      const p1 = positions[i], p2 = positions[pairs[i]];
+      svg += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="rgba(148,163,184,0.25)" stroke-width="1" class="rna-pair-line" data-i="${i}" data-j="${pairs[i]}"/>`;
+    }
+  }
+
+  // Draw bases
+  const dotR = n > 300 ? 2 : n > 100 ? 3 : 4;
+  for (let i = 0; i < n; i++) {
+    const p = positions[i];
+    const base = rnaSeq[i];
+    const color = BASE_COLORS[base] || '#94a3b8';
+    svg += `<circle cx="${p.x}" cy="${p.y}" r="${dotR}" fill="${color}" class="rna-base-dot" data-idx="${i}" data-base="${base}" data-paired="${pairs[i] >= 0 ? 1 : 0}"><title>${base}${i + 1}</title></circle>`;
+  }
+
+  svg += `</g>`;
+  svgEl.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
+  svgEl.innerHTML = svg;
+}
+
+function setup2DInteraction() {
+  const container = document.getElementById('rna-2d-container');
+  const svg = document.getElementById('rna-2d-svg');
+  if (!container || !svg) return;
+  container.onmousedown = function(e) {
+    rna2dDragging = true; rna2dDragStartX = e.clientX - rna2dPanX; rna2dDragStartY = e.clientY - rna2dPanY;
+    container.style.cursor = 'grabbing';
+  };
+  container.onmousemove = function(e) {
+    if (!rna2dDragging) return;
+    rna2dPanX = e.clientX - rna2dDragStartX; rna2dPanY = e.clientY - rna2dDragStartY;
+    applyRNA2DTransform();
+  };
+  container.onmouseup = container.onmouseleave = function() {
+    rna2dDragging = false; container.style.cursor = 'grab';
+  };
+  container.style.cursor = 'grab';
+  // Touch support
+  container.ontouchstart = function(e) {
+    if (e.touches.length === 1) {
+      rna2dDragging = true;
+      rna2dDragStartX = e.touches[0].clientX - rna2dPanX;
+      rna2dDragStartY = e.touches[0].clientY - rna2dPanY;
+    }
+  };
+  container.ontouchmove = function(e) {
+    if (!rna2dDragging || e.touches.length !== 1) return;
+    e.preventDefault();
+    rna2dPanX = e.touches[0].clientX - rna2dDragStartX;
+    rna2dPanY = e.touches[0].clientY - rna2dDragStartY;
+    applyRNA2DTransform();
+  };
+  container.ontouchend = function() { rna2dDragging = false; };
+}
+
+function applyRNA2DTransform() {
+  const g = document.getElementById('rna-2d-group');
+  if (g) g.setAttribute('transform', `translate(${rna2dPanX},${rna2dPanY}) scale(${rna2dZoom})`);
+}
+
+function rna2dZoomIn() { rna2dZoom = Math.min(rna2dZoom * 1.3, 5); applyRNA2DTransform(); }
+function rna2dZoomOut() { rna2dZoom = Math.max(rna2dZoom / 1.3, 0.2); applyRNA2DTransform(); }
+function rna2dReset() { rna2dZoom = 1; rna2dPanX = 0; rna2dPanY = 0; applyRNA2DTransform(); }
+
+function rna2dSetColor(mode) {
+  rna2dColorMode = mode;
+  const dots = document.querySelectorAll('.rna-base-dot');
+  const lines = document.querySelectorAll('.rna-pair-line');
+  const n = dots.length;
+  const BASE_COLORS = { A: '#ef4444', U: '#3b82f6', G: '#22c55e', C: '#f59e0b' };
+  // Update control buttons
+  ['base', 'pos', 'pair'].forEach(m => {
+    const btn = document.getElementById('rna-color-' + m);
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
+  dots.forEach((dot, i) => {
+    const base = dot.getAttribute('data-base');
+    const paired = dot.getAttribute('data-paired') === '1';
+    if (mode === 'base') {
+      dot.setAttribute('fill', BASE_COLORS[base] || '#94a3b8');
+    } else if (mode === 'pos') {
+      // 5'->3' gradient: blue to red
+      const ratio = i / Math.max(n - 1, 1);
+      const r = Math.round(59 + ratio * 180);
+      const g = Math.round(130 - ratio * 80);
+      const b = Math.round(246 - ratio * 180);
+      dot.setAttribute('fill', `rgb(${r},${g},${b})`);
+    } else if (mode === 'pair') {
+      dot.setAttribute('fill', paired ? '#f59e0b' : '#475569');
+    }
+  });
+  lines.forEach(line => {
+    if (mode === 'pair') {
+      line.setAttribute('stroke', 'rgba(245,158,11,0.4)');
+      line.setAttribute('stroke-width', '1.5');
+    } else {
+      line.setAttribute('stroke', 'rgba(148,163,184,0.25)');
+      line.setAttribute('stroke-width', '1');
+    }
+  });
+}
+
+// ── Mountain Plot (supports up to 3 lines: MFE, partition function, centroid) ──
+function drawMountainPlot(svgEl, structure, mountainMfe, mountainPf, mountainCentroid) {
+  const n = structure.length;
+  if (n === 0) return;
+
+  // Calculate nesting depth from structure (fallback if no server data)
+  let mfeData = mountainMfe;
+  if (!mfeData || mfeData.length === 0) {
+    mfeData = new Array(n);
+    let depth = 0;
+    for (let i = 0; i < n; i++) {
+      if (structure[i] === '(') depth++;
+      mfeData[i] = depth;
+      if (structure[i] === ')') depth--;
+    }
+  }
+
+  // Per-series max (for independent scaling) and global max
+  function seriesMax(arr) { let m = 0; if (arr) for (const v of arr) if (v > m) m = v; return m; }
+  const mfeMax = seriesMax(mfeData) || 1;
+  const pfMax = mountainPf && mountainPf.length ? (seriesMax(mountainPf) || 1) : 0;
+  const cMax = mountainCentroid && mountainCentroid.length ? (seriesMax(mountainCentroid) || 1) : 0;
+  // Use global max so absolute heights are comparable
+  let maxDepth = Math.max(mfeMax, pfMax, cMax);
+  if (maxDepth === 0) maxDepth = 1;
+
+  const svgW = svgEl.parentElement ? svgEl.parentElement.clientWidth : 600;
+  const svgH = svgEl.parentElement ? svgEl.parentElement.clientHeight : 200;
+  const padL = 45, padR = 15, padT = 20, padB = 30;
+  const plotW = svgW - padL - padR;
+  const plotH = svgH - padT - padB;
+
+  let svg = '';
+  svg += `<rect width="${svgW}" height="${svgH}" fill="var(--bg)" rx="0"/>`;
+
+  // Y grid lines (4 ticks: 0, 1/4, 1/2, 3/4, max — rounded to nice number)
+  function niceMax(v) {
+    if (v <= 0) return 1;
+    const exp10 = Math.pow(10, Math.floor(Math.log10(v)));
+    const f = v / exp10;
+    let nice;
+    if (f <= 1) nice = 1; else if (f <= 2) nice = 2; else if (f <= 3) nice = 3;
+    else if (f <= 5) nice = 5; else nice = 10;
+    return nice * exp10;
+  }
+  const niceY = niceMax(maxDepth);
+  maxDepth = niceY;
+  const yTicks = 4;
+  for (let i = 0; i <= yTicks; i++) {
+    const y = padT + plotH - (plotH * i / yTicks);
+    const val = Math.round(maxDepth * i / yTicks);
+    svg += `<line x1="${padL}" y1="${y}" x2="${svgW - padR}" y2="${y}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.6"/>`;
+    svg += `<text x="${padL - 8}" y="${y + 4}" fill="var(--muted)" font-size="10" text-anchor="end">${val}</text>`;
+  }
+  // Y axis label
+  svg += `<text x="12" y="${padT + plotH / 2}" fill="var(--muted)" font-size="10" text-anchor="middle" transform="rotate(-90,12,${padT + plotH / 2})">${t('rna_y_height') || 'height'}</text>`;
+
+  // X axis labels — denser grid (8-12 ticks based on width)
+  const xTicks = Math.max(6, Math.min(12, Math.floor(plotW / 60)));
+  for (let i = 0; i <= xTicks; i++) {
+    const pos = Math.round(n * i / xTicks);
+    const x = padL + (plotW * i / xTicks);
+    svg += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT + plotH}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.4"/>`;
+    svg += `<text x="${x}" y="${svgH - 10}" fill="var(--muted)" font-size="10" text-anchor="middle">${pos}</text>`;
+  }
+  svg += `<text x="${svgW / 2}" y="${svgH - 0}" fill="var(--muted)" font-size="10" text-anchor="middle">${t('rna_x_pos') || 'position (nt)'}</text>`;
+
+  // Helper to build path from data — sample at every plotW/2 steps for smoothness
+  function buildPath(data) {
+    const len = data.length;
+    const samples = Math.min(len, Math.max(200, Math.round(plotW * 2)));
+    const step = len / samples;
+    let p = '';
+    for (let s = 0; s < samples; s++) {
+      const i = Math.min(len - 1, Math.floor(s * step));
+      const x = padL + (i / Math.max(1, len - 1)) * plotW;
+      const y = padT + plotH - (data[i] / maxDepth) * plotH;
+      p += (s === 0 ? 'M' : 'L') + `${x.toFixed(1)},${y.toFixed(1)}`;
+    }
+    return p;
+  }
+
+  // Draw lines in order: PF (green), Centroid (blue), MFE (red) — MFE on top
+  const baseY = padT + plotH;
+  const lastX = padL + plotW;
+
+  if (mountainPf && mountainPf.length) {
+    const pfPath = buildPath(mountainPf);
+    svg += `<path d="${pfPath}L${lastX.toFixed(1)},${baseY}L${padL},${baseY}Z" fill="rgba(34,197,94,0.08)" stroke="none"/>`;
+    svg += `<path d="${pfPath}" fill="none" stroke="#22c55e" stroke-width="1.6" stroke-linejoin="round" opacity="0.9"/>`;
+  }
+  if (mountainCentroid && mountainCentroid.length) {
+    const cPath = buildPath(mountainCentroid);
+    svg += `<path d="${cPath}" fill="none" stroke="#3b82f6" stroke-width="1.6" stroke-linejoin="round" opacity="0.9"/>`;
+  }
+
+  // MFE line (always shown) with fill
+  const mfePath = buildPath(mfeData);
+  svg += `<path d="${mfePath}L${lastX.toFixed(1)},${baseY}L${padL},${baseY}Z" fill="rgba(239,68,68,0.14)" stroke="none"/>`;
+  svg += `<path d="${mfePath}" fill="none" stroke="#ef4444" stroke-width="2" stroke-linejoin="round"/>`;
+
+  // Hover overlay group (initially hidden)
+  svg += `<g id="${svgEl.id}-hover" style="display:none">
+    <line class="ttip-guide" stroke="rgba(148,163,184,0.55)" stroke-width="1" stroke-dasharray="3,3"/>
+    <circle class="ttip-dot-mfe" r="4" fill="#ef4444" stroke="#fff" stroke-width="1.5"/>
+    <circle class="ttip-dot-pf" r="4" fill="#22c55e" stroke="#fff" stroke-width="1.5" style="display:none"/>
+    <circle class="ttip-dot-centroid" r="4" fill="#3b82f6" stroke="#fff" stroke-width="1.5" style="display:none"/>
+  </g>`;
+
+  svgEl.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
+  svgEl.innerHTML = svg;
+
+  // Attach hover interaction
+  attachChartHover(svgEl, {
+    type: 'mountain',
+    n, padL, padR, padT, plotW, plotH, svgW, svgH, maxValue: maxDepth,
+    series: [
+      { name: t('rna_mountain_mfe'), color: '#ef4444', data: mfeData, dotClass: 'ttip-dot-mfe', format: v => v.toFixed(2) },
+      mountainPf && mountainPf.length ? { name: t('rna_mountain_pf'), color: '#22c55e', data: mountainPf, dotClass: 'ttip-dot-pf', format: v => v.toFixed(2) } : null,
+      mountainCentroid && mountainCentroid.length ? { name: t('rna_mountain_centroid'), color: '#3b82f6', data: mountainCentroid, dotClass: 'ttip-dot-centroid', format: v => v.toFixed(2) } : null,
+    ].filter(Boolean),
+  });
+}
+
+// ── Positional Entropy Plot ──
+function drawEntropyPlot(svgEl, entropyData) {
+  const n = entropyData.length;
+  if (n === 0) return;
+
+  let maxEntropy = 0;
+  for (const v of entropyData) { if (v > maxEntropy) maxEntropy = v; }
+  // ViennaRNA per-pair Shannon entropy can exceed 1 (theoretical max ≈ log2(n))
+  if (!isFinite(maxEntropy) || maxEntropy <= 0) maxEntropy = 1;
+
+  const svgW = svgEl.parentElement ? svgEl.parentElement.clientWidth : 600;
+  const svgH = svgEl.parentElement ? svgEl.parentElement.clientHeight : 200;
+  const padL = 45, padR = 15, padT = 20, padB = 30;
+  const plotW = svgW - padL - padR;
+  const plotH = svgH - padT - padB;
+
+  let svg = '';
+  svg += `<rect width="${svgW}" height="${svgH}" fill="var(--bg)" rx="0"/>`;
+
+  // Y grid lines — round max to nice number above actual max
+  function niceMax(v) {
+    if (v <= 0) return 1;
+    const exp10 = Math.pow(10, Math.floor(Math.log10(v)));
+    const f = v / exp10;
+    let nice;
+    if (f <= 1) nice = 1; else if (f <= 1.3) nice = 1.3;
+    else if (f <= 2) nice = 2; else if (f <= 2.6) nice = 2.6;
+    else if (f <= 3) nice = 3; else if (f <= 5) nice = 5; else nice = 10;
+    return nice * exp10;
+  }
+  maxEntropy = niceMax(maxEntropy);
+  const yTicks = 4;
+  for (let i = 0; i <= yTicks; i++) {
+    const y = padT + plotH - (plotH * i / yTicks);
+    const val = (maxEntropy * i / yTicks).toFixed(2);
+    svg += `<line x1="${padL}" y1="${y}" x2="${svgW - padR}" y2="${y}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.6"/>`;
+    svg += `<text x="${padL - 8}" y="${y + 4}" fill="var(--muted)" font-size="10" text-anchor="end">${val}</text>`;
+  }
+  // Y axis label
+  svg += `<text x="12" y="${padT + plotH / 2}" fill="var(--muted)" font-size="10" text-anchor="middle" transform="rotate(-90,12,${padT + plotH / 2})">${t('rna_y_entropy') || 'entropy'}</text>`;
+
+  // X axis labels — denser ticks
+  const xTicks = Math.max(6, Math.min(12, Math.floor(plotW / 60)));
+  for (let i = 0; i <= xTicks; i++) {
+    const pos = Math.round(n * i / xTicks);
+    const x = padL + (plotW * i / xTicks);
+    svg += `<line x1="${x}" y1="${padT}" x2="${x}" y2="${padT + plotH}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,3" opacity="0.4"/>`;
+    svg += `<text x="${x}" y="${svgH - 10}" fill="var(--muted)" font-size="10" text-anchor="middle">${pos}</text>`;
+  }
+  svg += `<text x="${svgW / 2}" y="${svgH - 0}" fill="var(--muted)" font-size="10" text-anchor="middle">${t('rna_x_pos') || 'position (nt)'}</text>`;
+
+  // Build path with dense sampling for smooth curve
+  const samples = Math.min(n, Math.max(200, Math.round(plotW * 2)));
+  const step = n / samples;
+  let path = '';
+  for (let s = 0; s < samples; s++) {
+    const i = Math.min(n - 1, Math.floor(s * step));
+    const x = padL + (i / Math.max(1, n - 1)) * plotW;
+    const y = padT + plotH - (entropyData[i] / maxEntropy) * plotH;
+    path += (s === 0 ? 'M' : 'L') + `${x.toFixed(1)},${y.toFixed(1)}`;
+  }
+  // Fill area
+  const lastX = padL + plotW;
+  const baseY = padT + plotH;
+  svg += `<path d="${path}L${lastX.toFixed(1)},${baseY}L${padL},${baseY}Z" fill="rgba(245,158,11,0.12)" stroke="none"/>`;
+  svg += `<path d="${path}" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-linejoin="round"/>`;
+
+  // Hover overlay (initially hidden)
+  svg += `<g id="${svgEl.id}-hover" style="display:none">
+    <line class="ttip-guide" stroke="rgba(148,163,184,0.55)" stroke-width="1" stroke-dasharray="3,3"/>
+    <circle class="ttip-dot-entropy" r="4" fill="#f59e0b" stroke="#fff" stroke-width="1.5"/>
+  </g>`;
+
+  svgEl.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
+  svgEl.innerHTML = svg;
+
+  // Attach hover interaction
+  attachChartHover(svgEl, {
+    type: 'entropy',
+    n, padL, padR, padT, plotW, plotH, svgW, svgH, maxValue: maxEntropy,
+    series: [
+      { name: t('rna_y_entropy'), color: '#f59e0b', data: entropyData, dotClass: 'ttip-dot-entropy', format: v => v.toFixed(3) },
+    ],
+  });
+}
+
+// ── Generic chart hover tooltip helper ──
+function attachChartHover(svgEl, cfg) {
+  const container = svgEl.parentElement;
+  if (!container) return;
+  const { n, padL, padR, padT, plotW, plotH, svgW, svgH, series } = cfg;
+
+  // Create tooltip div if not exists
+  let tip = container.querySelector('.rna-chart-tooltip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.className = 'rna-chart-tooltip';
+    container.appendChild(tip);
+  }
+
+  const hoverGroup = svgEl.querySelector('#' + svgEl.id + '-hover');
+  if (!hoverGroup) return;
+  const guide = hoverGroup.querySelector('.ttip-guide');
+  const dotEls = series.map(s => hoverGroup.querySelector('.' + s.dotClass));
+
+  function update(clientX, clientY) {
+    const rect = svgEl.getBoundingClientRect();
+    // Map client X → SVG viewBox X
+    const xRel = (clientX - rect.left) / rect.width * svgW;
+    if (xRel < padL || xRel > svgW - padR) {
+      hoverGroup.style.display = 'none';
+      tip.classList.remove('visible');
+      return;
+    }
+    // Use first series length as canonical n (all series share length)
+    const dataLen = series[0].data.length;
+    const ratio = (xRel - padL) / plotW;
+    const i = Math.max(0, Math.min(dataLen - 1, Math.round(ratio * (dataLen - 1))));
+    const xExact = padL + (i / Math.max(1, dataLen - 1)) * plotW;
+
+    // Update guide line
+    guide.setAttribute('x1', xExact);
+    guide.setAttribute('x2', xExact);
+    guide.setAttribute('y1', padT);
+    guide.setAttribute('y2', padT + plotH);
+
+    // Update each series dot
+    let topY = Infinity;
+    series.forEach((s, idx) => {
+      const v = s.data[Math.min(i, s.data.length - 1)];
+      const y = padT + plotH - (v / cfg.maxValue) * plotH;
+      const dot = dotEls[idx];
+      if (dot) {
+        dot.setAttribute('cx', xExact);
+        dot.setAttribute('cy', y);
+        dot.style.display = '';
       }
-    }, 30);
+      if (y < topY) topY = y;
+    });
+    hoverGroup.style.display = '';
+
+    // Build tooltip HTML
+    let html = `<div class="ttip-title">${t('rna_x_pos').replace(/\(nt\)/, '').trim() || '位置'} ${i + 1}</div>`;
+    series.forEach(s => {
+      const v = s.data[Math.min(i, s.data.length - 1)];
+      html += `<div class="ttip-row"><span class="ttip-dot" style="background:${s.color}"></span>${s.name}: ${s.format(v)}</div>`;
+    });
+    tip.innerHTML = html;
+    tip.classList.add('visible');
+
+    // Position tooltip in container coordinates (px)
+    const cRect = container.getBoundingClientRect();
+    const tipW = tip.offsetWidth, tipH = tip.offsetHeight;
+    // Convert SVG (xExact, topY) → container px
+    const pxX = (xExact / svgW) * rect.width;
+    const pxY = (topY / svgH) * rect.height;
+    let left = pxX + 14;
+    let top = pxY - tipH - 8;
+    if (left + tipW + 4 > cRect.width) left = pxX - tipW - 14;
+    if (top < 4) top = pxY + 14;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+
+  function onMove(e) {
+    const t = e.touches ? e.touches[0] : e;
+    update(t.clientX, t.clientY);
+  }
+  function onLeave() {
+    hoverGroup.style.display = 'none';
+    tip.classList.remove('visible');
+  }
+
+  container.onmousemove = onMove;
+  container.onmouseleave = onLeave;
+  container.ontouchstart = onMove;
+  container.ontouchmove = function(e) { e.preventDefault(); onMove(e); };
+  container.ontouchend = onLeave;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ESMFold
+// ══════════════════════════════════════════════════════════════════
+let esmViewer=null,lastPDB='';
+async function runESMFold(){const protein=document.getElementById('pa-protein-input').value.trim().toUpperCase().replace(/[^A-Z]/g,'');const eE=document.getElementById('esm-err-msg'),eT=document.getElementById('esm-err-text');eE.classList.remove('visible');
+if(!protein){eT.textContent=t('err_protein_empty');eE.classList.add('visible');return;}if(protein.length>400){eT.textContent=t('err_esm_long');eE.classList.add('visible');return;}
+const btn=document.getElementById('esm-run-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> '+t('esm_generating');
+try{const r=await fetch('https://api.esmatlas.com/foldSequence/v1/pdb/',{method:'POST',headers:{'Content-Type':'text/plain'},body:protein});if(!r.ok)throw new Error('ESMFold API: '+r.status);const pdb=await r.text();lastPDB=pdb;
+const bf=[];for(const l of pdb.split('\n')){if(l.startsWith('ATOM')&&l.length>60){const b=parseFloat(l.slice(60,66).trim());if(!isNaN(b))bf.push(b);}}let avg=bf.length?bf.reduce((a,b)=>a+b,0)/bf.length:0;
+// ESM Atlas API returns pLDDT in 0-1 scale; normalize to 0-100 if needed
+const bfMax=bf.length?Math.max(...bf):0;if(bfMax<=1.5)avg*=100;
+document.getElementById('esm-results').style.display='block';
+saveHistory('esmfold',{proteinInput:protein,residueCount:protein.length,plddt:avg});
+document.getElementById('esm-info').innerHTML=`<span class="esm-badge" style="background:var(--green-lt);color:var(--green)">${t('esm_length')}: ${protein.length}</span><span class="esm-badge" style="background:${avg>70?'var(--green-lt)':avg>50?'var(--amber-lt)':'var(--red-lt)'};color:${avg>70?'var(--green)':avg>50?'var(--amber)':'var(--red)'}">${t('esm_avg_plddt')}: ${avg.toFixed(1)}</span>`;
+const vd=document.getElementById('esm-viewer');vd.innerHTML='';esmViewer=$3Dmol.createViewer(vd,{backgroundColor:'#0f172a'});esmViewer.addModel(pdb,'pdb');setESMStyle('cartoon');setESMColor('spectrum');esmViewer.zoomTo();esmViewer.render();
+document.getElementById('esm-results').scrollIntoView({behavior:'smooth',block:'nearest'});}
+catch(e){eT.textContent=e.message||'Error';eE.classList.add('visible');}
+finally{btn.disabled=false;btn.innerHTML='<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg> <span data-i18n="esm_run_btn">'+t('esm_run_btn')+'</span>';}}
+
+function setESMStyle(s){if(!esmViewer)return;esmViewer.setStyle({},{});if(s==='cartoon')esmViewer.setStyle({},{cartoon:{color:'spectrum'}});else if(s==='stick')esmViewer.setStyle({},{stick:{colorscheme:'rasmol'}});else if(s==='sphere')esmViewer.setStyle({},{sphere:{colorscheme:'rasmol',scale:.3}});esmViewer.render();document.querySelectorAll('#esm-controls .viewer-ctrl-btn').forEach(b=>b.classList.remove('active'));if(event&&event.target)event.target.classList.add('active');}
+function setESMColor(s){if(!esmViewer)return;if(s==='spectrum')esmViewer.setStyle({},{cartoon:{color:'spectrum'}});else if(s==='confidence')esmViewer.setStyle({},{cartoon:{colorfunc:function(a){let b=a.b;if(b<=1.5)b*=100;if(b>90)return'#0000FF';if(b>70)return'#00AAFF';if(b>50)return'#FFAA00';return'#FF0000';}}});esmViewer.render();}
+function downloadPDB(){if(!lastPDB)return;triggerDownload(new Blob([lastPDB],{type:'text/plain'}),'esmfold.pdb');}
+
+// ══════════════════════════════════════════════════════════════════
+// BLAST
+// ══════════════════════════════════════════════════════════════════
+let blastRID=null;
+async function runBLAST(){const protein=document.getElementById('pa-protein-input').value.trim().toUpperCase().replace(/[^A-Z]/g,'');const eE=document.getElementById('blast-err-msg'),eT=document.getElementById('blast-err-text');eE.classList.remove('visible');
+if(!protein){eT.textContent=t('err_protein_empty');eE.classList.add('visible');return;}
+const btn=document.getElementById('blast-run-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> '+t('blast_searching');
+const c=document.getElementById('blast-results');c.style.display='block';c.innerHTML=`<div class="blast-progress"><div class="spinner-large"></div><p>${t('blast_waiting')}</p></div>`;
+try{const pp=new URLSearchParams({CMD:'Put',PROGRAM:'blastp',DATABASE:document.getElementById('blast-db').value,QUERY:protein,FORMAT_TYPE:'JSON2_S',HITLIST_SIZE:'10'});
+const pr=await fetch('https://blast.ncbi.nlm.nih.gov/blast/Blast.cgi',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:pp.toString()});const pt=await pr.text();const rm=pt.match(/RID = (\S+)/);if(!rm)throw new Error('Submit failed');blastRID=rm[1];
+let att=0;const mx=30;while(att<mx){await new Promise(r=>setTimeout(r,5000));att++;const gp=new URLSearchParams({CMD:'Get',RID:blastRID,FORMAT_TYPE:'JSON2_S'});const gr=await fetch('https://blast.ncbi.nlm.nih.gov/blast/Blast.cgi?'+gp.toString());const gt=await gr.text();
+if(gt.includes('Status=WAITING')){c.innerHTML=`<div class="blast-progress"><div class="spinner-large"></div><p>${t('blast_waiting')} (${att*5}s)</p></div>`;continue;}
+if(gt.includes('Status=FAILED'))throw new Error('BLAST failed');if(gt.includes('Status=UNKNOWN'))throw new Error('Job expired');
+try{const ji=gt.indexOf('{');if(ji===-1)throw new Error('No JSON');displayBLASTResults(JSON.parse(gt.slice(ji)));return;}catch(pe){if(att<mx)continue;throw pe;}}throw new Error('Timeout');}
+catch(e){eT.textContent=e.message||'Error';eE.classList.add('visible');c.style.display='none';}
+finally{btn.disabled=false;btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> <span data-i18n="blast_run_btn">'+t('blast_run_btn')+'</span>';}}
+
+function displayBLASTResults(d){const c=document.getElementById('blast-results');try{const sr=d.BlastOutput2?.[0]?.report?.results?.search;if(!sr){c.innerHTML=`<p style="color:var(--muted);padding:16px">${t('blast_no_hits')}</p>`;return;}
+const hits=sr.hits||[];if(!hits.length){c.innerHTML=`<p style="color:var(--muted);padding:16px">${t('blast_no_hits')}</p>`;return;}
+const blastProtein=document.getElementById('pa-protein-input').value.trim().toUpperCase().replace(/[^A-Z]/g,'');
+const topDesc=hits[0]?.description?.[0];const topHsp=hits[0]?.hsps?.[0];
+saveHistory('blast',{proteinInput:blastProtein.slice(0,2000),hitsCount:hits.length,topHitName:topDesc?.title?.slice(0,100)||'',topHitAccession:topDesc?.accession||'',topHitEvalue:topHsp?.evalue,topHitIdentity:topHsp?.identity&&topHsp?.align_len?(topHsp.identity/topHsp.align_len*100):0});
+const ql=sr.query_len||1;let h=`<p style="font-size:.8rem;color:var(--text-secondary);margin:14px 0 16px"><strong>${hits.length}</strong> hits${blastRID?` · <a href="https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Get&RID=${blastRID}&FORMAT_TYPE=HTML" target="_blank" style="color:var(--green)">View on NCBI</a>`:''}</p>`;
+for(const hit of hits.slice(0,10)){const desc=hit.description?.[0]||{};const acc=desc.accession||'';const title=desc.title||'Unknown';const org=desc.sciname||'';const hsp=hit.hsps?.[0]||{};
+const id=hsp.identity&&hsp.align_len?(hsp.identity/hsp.align_len*100).toFixed(1):'?';const ev=hsp.evalue!==undefined?hsp.evalue.toExponential(1):'?';const sc=hsp.bit_score?hsp.bit_score.toFixed(0):'?';const cv=hsp.query_to&&hsp.query_from?((hsp.query_to-hsp.query_from+1)/ql*100).toFixed(0):'?';
+h+=`<div class="blast-hit"><div class="blast-hit-header"><div class="blast-hit-name"><a href="https://www.ncbi.nlm.nih.gov/protein/${acc}" target="_blank">${acc}</a> ${title}${org?` <span style="font-size:.72rem;color:var(--muted);font-style:italic">— ${org}</span>`:''}</div></div><div class="blast-stats"><span class="blast-stat"><strong>${t('blast_identity')}:</strong> ${id}%</span><span class="blast-stat"><strong>${t('blast_evalue')}:</strong> ${ev}</span><span class="blast-stat"><strong>${t('blast_score')}:</strong> ${sc}</span><span class="blast-stat"><strong>${t('blast_coverage')}:</strong> ${cv}%</span></div>`;
+if(hsp.qseq&&hsp.hseq&&hsp.midline){h+=`<div class="blast-alignment">Query  ${hsp.qseq.slice(0,60)}\n       ${hsp.midline.slice(0,60)}\nSbjct  ${hsp.hseq.slice(0,60)}</div>`;}h+='</div>';}c.innerHTML=h;}catch(e){c.innerHTML=`<p style="color:var(--red);padding:16px">Error: ${e.message}</p>`;}}
+
+// ── Keyboard shortcuts & init ──
+document.getElementById('seq-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))runOptimization();});
+setLang(currentLang);
+document.getElementById('strategy-desc').innerHTML = t('strategy_desc');
+
+// ══════════════════════════════════════════════════════════════════
+// Firebase Auth & History
+// ══════════════════════════════════════════════════════════════════
+let currentUser = null;
+let historyItems = [];
+
+function updateAuthUI() {
+  currentUser = window.currentUser || null;
+  const btn = document.getElementById('auth-btn');
+  const histBtn = document.getElementById('history-btn');
+  const menu = document.getElementById('auth-menu');
+  menu.classList.remove('open');
+  if (currentUser) {
+    const photo = currentUser.photoURL;
+    const name = currentUser.displayName || currentUser.email || '';
+    const shortName = name.split(' ')[0] || name.split('@')[0];
+    btn.innerHTML = (photo ? `<img src="${photo}" alt="">` : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`) +
+      `<span class="auth-user-name">${shortName}</span>` +
+      `<svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor"><path d="M2 4l4 4 4-4"/></svg>`;
+    histBtn.style.display = 'inline-flex';
+  } else {
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span id="auth-label" data-i18n="btn_login">${t('btn_login')}</span>`;
+    histBtn.style.display = 'none';
+    historyItems = [];
+    closeHistoryPanel();
+  }
+}
+window.updateAuthUI = updateAuthUI;
+
+function handleAuthClick() {
+  if (currentUser) {
+    const menu = document.getElementById('auth-menu');
+    menu.classList.toggle('open');
+  } else {
+    handleLogin();
   }
 }
 
-function resetButton() {
-  const btn = document.getElementById('run-btn');
-  btn.disabled = false;
-  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg> Optimize';
-}
-
-async function fetchExtendedMetrics(dna) {
+async function handleLogin() {
   try {
-    const result = await callAPI('evaluate', { dna_sequence: dna });
-    showExtendedMetrics(result);
+    await window.fbSignInWithPopup(window.fbAuth, window.googleProvider);
   } catch (e) {
-    // Silently fail — client-side metrics are already shown
+    if (e.code !== 'auth/popup-closed-by-user') {
+      console.error('Login error:', e);
+    }
   }
 }
 
-function showResults(dna, protein, strategy) {
-  const gc = calcGC(dna);
-  const csi = calcCSI(dna);
-  const ntLen = dna.length;
-  const aaLen = protein.length;
-  const start = dna.slice(0, 3);
-  const stop  = dna.slice(-3);
-
-  // GC bar
-  document.getElementById('m-gc').textContent = gc.toFixed(1) + '%';
-  const gcBarPct = Math.min(gc / 70 * 100, 100);
-  const gcBar = document.getElementById('m-gc-bar');
-  gcBar.style.width = gcBarPct + '%';
-  gcBar.className = 'metric-bar-fill' + (gc > 55 ? ' bad' : gc > 42 ? ' warn' : '');
-
-  // Length
-  document.getElementById('m-len').textContent = ntLen + ' nt';
-  document.getElementById('m-len-sub').textContent = aaLen + ' aa · ' + (ntLen/3|0) + ' codons';
-
-  // CSI
-  document.getElementById('m-csi').textContent = csi.toFixed(3);
-  document.getElementById('m-csi-bar').style.width = (csi * 100) + '%';
-
-  // Start/Stop
-  document.getElementById('m-startstop').textContent = start + ' / ' + stop;
-  const ok = (start === 'ATG' || start === 'GTG') && STOP_CODONS.includes(stop);
-  document.getElementById('m-startstop-sub').textContent = ok ? 'Valid start & stop' : 'Check codons';
-  document.getElementById('m-startstop-sub').style.color = ok ? 'var(--green)' : 'var(--amber)';
-
-  // Hide extended metrics until API responds
-  hideExtendedMetrics();
-
-  // Colored DNA
-  const codons = [];
-  for (let i = 0; i < dna.length; i += 3) codons.push(dna.slice(i, i+3));
-  document.getElementById('dna-colored').innerHTML = codons
-    .map(c => `<span class="codon">${c}</span>`)
-    .join('');
-
-  document.getElementById('results').classList.add('visible');
-  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+async function handleLogout() {
+  document.getElementById('auth-menu').classList.remove('open');
+  try {
+    await window.fbSignOut(window.fbAuth);
+    currentUser = null;
+    updateAuthUI();
+  } catch (e) { console.error('Logout error:', e); }
 }
 
-function showExtendedMetrics(r) {
-  // Update CSI and GC from server (more accurate)
-  if (r.csi !== undefined) {
-    document.getElementById('m-csi').textContent = r.csi.toFixed(3);
-    document.getElementById('m-csi-bar').style.width = (r.csi * 100) + '%';
+// Close auth menu on outside click
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('auth-wrap');
+  if (!wrap.contains(e.target)) {
+    document.getElementById('auth-menu').classList.remove('open');
   }
-  if (r.gc_percent !== undefined) {
-    document.getElementById('m-gc').textContent = r.gc_percent.toFixed(1) + '%';
-    const gcBarPct = Math.min(r.gc_percent / 70 * 100, 100);
-    const gcBar = document.getElementById('m-gc-bar');
-    gcBar.style.width = gcBarPct + '%';
-    gcBar.className = 'metric-bar-fill' + (r.gc_percent > 55 ? ' bad' : r.gc_percent > 42 ? ' warn' : '');
-  }
-
-  // CFD
-  showMetricBox('box-cfd');
-  document.getElementById('m-cfd').textContent = r.cfd.toFixed(3);
-  document.getElementById('m-cfd-bar').style.width = (r.cfd * 100) + '%';
-
-  // %MinMax
-  showMetricBox('box-minmax');
-  document.getElementById('m-minmax').textContent = r.minmax_mean.toFixed(1);
-  document.getElementById('m-minmax-bar').style.width = Math.min(r.minmax_mean, 100) + '%';
-
-  // Cis-elements
-  showMetricBox('box-cis');
-  const cisEl = document.getElementById('m-cis');
-  cisEl.textContent = r.cis_elements;
-  cisEl.style.color = r.cis_elements === 0 ? 'var(--green)' : r.cis_elements <= 2 ? 'var(--amber)' : 'var(--red)';
-
-  // MFE
-  showMetricBox('box-mfe');
-  document.getElementById('m-mfe').textContent = r.mfe !== null ? r.mfe.toFixed(1) : 'N/A';
-
-  // Complexity
-  showMetricBox('box-complexity');
-  document.getElementById('m-complexity').textContent = r.complexity.toFixed(3);
-  document.getElementById('m-complexity-bar').style.width = (r.complexity * 100) + '%';
-}
-
-function showMetricBox(id) {
-  document.getElementById(id).style.display = '';
-}
-
-function hideExtendedMetrics() {
-  ['box-cfd', 'box-minmax', 'box-cis', 'box-mfe', 'box-complexity'].forEach(id => {
-    document.getElementById(id).style.display = 'none';
-  });
-}
-
-// ── Copy / Download
-function copyDNA() {
-  navigator.clipboard.writeText(lastDNA).then(() => {
-    const btn = document.querySelector('.copy-btn');
-    btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = 'Copy', 1500);
-  });
-}
-
-function downloadFasta() {
-  if (!lastDNA) return;
-  const strategy = document.querySelector('input[name="strategy"]:checked').value;
-  const header = `>ChlamyDesign|${strategy}|${lastProtein.length}aa`;
-  const seq = lastDNA.match(/.{1,60}/g).join('\n');
-  const blob = new Blob([header + '\n' + seq + '\n'], {type:'text/plain'});
-  triggerDownload(blob, 'chlamydesign_optimized.fasta');
-}
-
-function downloadCSV() {
-  if (!lastDNA) return;
-  const strategy = document.querySelector('input[name="strategy"]:checked').value;
-  const gc = calcGC(lastDNA).toFixed(2);
-  const csi = calcCSI(lastDNA).toFixed(4);
-  const rows = [
-    'strategy,dna,protein,gc_percent,csi,length_nt,length_aa',
-    `${strategy},${lastDNA},${lastProtein}_,${gc},${csi},${lastDNA.length},${lastProtein.length}`
-  ];
-  const blob = new Blob([rows.join('\n') + '\n'], {type:'text/csv'});
-  triggerDownload(blob, 'chlamydesign_optimized.csv');
-}
-
-function triggerDownload(blob, name) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = name; a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ── Enter key shortcut
-document.getElementById('seq-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) runOptimization();
 });
+
+// ── History Panel ──
+function toggleHistoryPanel() {
+  document.getElementById('auth-menu').classList.remove('open');
+  const overlay = document.getElementById('history-overlay');
+  const panel = document.getElementById('history-panel');
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) { closeHistoryPanel(); } else { overlay.classList.add('open'); panel.classList.add('open'); }
+}
+
+function closeHistoryPanel() {
+  document.getElementById('history-overlay').classList.remove('open');
+  document.getElementById('history-panel').classList.remove('open');
+}
+
+// ── Save to Firestore ──
+async function saveHistory(type, data) {
+  if (!currentUser || !window.fbDb) return;
+  try {
+    const doc = {
+      uid: currentUser.uid,
+      createdAt: window.fbTimestamp.now(),
+      type: type,
+      ...data
+    };
+    // Truncate long strings
+    if (doc.dnaOutput && doc.dnaOutput.length > 9000) doc.dnaOutput = doc.dnaOutput.slice(0, 9000);
+    if (doc.proteinInput && doc.proteinInput.length > 6200) doc.proteinInput = doc.proteinInput.slice(0, 6200);
+    await window.fbAddDoc(window.fbCollection(window.fbDb, 'history'), doc);
+    loadHistory();
+  } catch (e) { console.error('Save history error:', e); }
+}
+window.saveHistory = saveHistory;
+
+// ── Load from Firestore ──
+async function loadHistory() {
+  if (!currentUser || !window.fbDb) return;
+  try {
+    const q = window.fbQuery(
+      window.fbCollection(window.fbDb, 'history'),
+      window.fbWhere('uid', '==', currentUser.uid),
+      window.fbOrderBy('createdAt', 'desc')
+    );
+    const snap = await window.fbGetDocs(q);
+    historyItems = [];
+    snap.forEach(d => historyItems.push({ id: d.id, ...d.data() }));
+    renderHistory();
+    // Update badge count
+    const badge = document.getElementById('history-count');
+    if (historyItems.length > 0) {
+      badge.textContent = historyItems.length;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch (e) { console.error('Load history error:', e); }
+}
+window.loadHistory = loadHistory;
+
+function renderHistory() {
+  const body = document.getElementById('history-body');
+  if (!historyItems.length) {
+    body.innerHTML = `<div class="side-panel-empty">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <p style="font-size:.85rem;font-weight:600">${t('history_empty')}</p>
+      <p style="font-size:.75rem;margin-top:4px">${t('history_empty_sub')}</p>
+    </div>`;
+    return;
+  }
+  let html = '';
+  let lastDate = '';
+  for (const item of historyItems) {
+    const d = item.createdAt?.toDate ? item.createdAt.toDate() : new Date();
+    const dateStr = d.toLocaleDateString(currentLang === 'ja' ? 'ja-JP' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    if (dateStr !== lastDate) {
+      html += `<div class="history-date-label">${dateStr}</div>`;
+      lastDate = dateStr;
+    }
+    const time = d.toLocaleTimeString(currentLang === 'ja' ? 'ja-JP' : 'en-US', { hour: '2-digit', minute: '2-digit' });
+    html += renderHistoryCard(item, time);
+  }
+  body.innerHTML = html;
+}
+
+function renderHistoryCard(item, time) {
+  const typeConfig = {
+    optimize: { icon: '🧬', cls: 'opt', label: t('history_type_opt') },
+    restriction: { icon: '🔧', cls: 're', label: t('history_type_re') },
+    rna: { icon: '🧪', cls: 'rna', label: t('history_type_rna') },
+    esmfold: { icon: '🔮', cls: 'esm', label: t('history_type_esm') },
+    blast: { icon: '🔍', cls: 'blast', label: t('history_type_blast') },
+  };
+  const tc = typeConfig[item.type] || typeConfig.optimize;
+  let title = '', meta = '';
+
+  if (item.type === 'optimize') {
+    const pShort = (item.proteinInput || '').slice(0, 20) + (item.proteinInput?.length > 20 ? '...' : '');
+    const orgShort = (item.organism || '').split(' ').slice(0, 2).join(' ');
+    title = `${pShort} → ${orgShort}`;
+    meta = `${item.strategy || 'cai_max'} | ${item.lengthNt || '?'} nt | GC ${(item.gcPercent || 0).toFixed(1)}%`;
+  } else if (item.type === 'restriction') {
+    title = t('history_type_re');
+    meta = `${item.lengthNt || '?'} nt | ${item.totalSites || 0} sites`;
+  } else if (item.type === 'rna') {
+    title = t('history_type_rna');
+    meta = `${item.lengthNt || '?'} nt | MFE ${(item.mfe || 0).toFixed(1)} | ${item.region || 'full'}`;
+  } else if (item.type === 'esmfold') {
+    title = t('history_type_esm');
+    meta = `${item.residueCount || '?'} aa | pLDDT ${(item.plddt || 0).toFixed(1)}`;
+  } else if (item.type === 'blast') {
+    title = t('history_type_blast');
+    meta = `${item.hitsCount || 0} hits${item.topHitName ? ' | ' + item.topHitName.slice(0, 30) : ''}`;
+  }
+
+  return `<div class="history-card">
+    <div class="history-card-header">
+      <div class="history-type-icon ${tc.cls}">${tc.icon}</div>
+      <div class="history-card-title">${title}</div>
+      <span style="font-size:.65rem;color:var(--muted)">${time}</span>
+    </div>
+    <div class="history-card-meta">${meta}</div>
+    <div class="history-card-actions">
+      <button onclick="restoreHistory('${item.id}')" data-i18n="history_restore">${t('history_restore')}</button>
+      <button class="del-btn" onclick="deleteHistory('${item.id}')" data-i18n="history_delete">${t('history_delete')}</button>
+    </div>
+  </div>`;
+}
+
+// ── Restore history item ──
+function restoreHistory(id) {
+  const item = historyItems.find(h => h.id === id);
+  if (!item) return;
+  closeHistoryPanel();
+
+  if (item.type === 'optimize') {
+    switchTab('codon');
+    if (item.organism) { selectOrganism(item.organism); }
+    if (item.proteinInput) {
+      document.getElementById('seq-input').value = item.proteinInput;
+      document.getElementById('seq-len').textContent = item.proteinInput.replace(/[_*]/g, '').length + ' aa';
+    }
+    if (item.strategy) {
+      const radio = document.querySelector(`input[name="strategy"][value="${item.strategy}"]`);
+      if (radio) { radio.checked = true; document.getElementById('slider-panel').classList.toggle('visible', CT_STRATEGIES.includes(item.strategy)); }
+    }
+    // Show results if DNA is saved
+    if (item.dnaOutput) {
+      lastDNA = item.dnaOutput;
+      lastProtein = (item.proteinInput || '').replace(/[_*]$/g, '');
+      showResults(item.dnaOutput, lastProtein, item.strategy || 'cai_max');
+    }
+  } else if (item.type === 'restriction' || item.type === 'rna') {
+    switchTab('seqanalysis');
+    if (item.dnaInput) {
+      document.getElementById('sa-dna-input').value = item.dnaInput;
+      document.getElementById('sa-seq-len').textContent = item.dnaInput.length + ' nt';
+    }
+  } else if (item.type === 'esmfold' || item.type === 'blast') {
+    switchTab('protein');
+    if (item.proteinInput) {
+      document.getElementById('pa-protein-input').value = item.proteinInput;
+      document.getElementById('pa-seq-len').textContent = item.proteinInput.length + ' aa';
+    }
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Delete history item ──
+async function deleteHistory(id) {
+  if (!window.fbDb) return;
+  try {
+    await window.fbDeleteDoc(window.fbDoc(window.fbDb, 'history', id));
+    historyItems = historyItems.filter(h => h.id !== id);
+    renderHistory();
+    const badge = document.getElementById('history-count');
+    if (historyItems.length > 0) { badge.textContent = historyItems.length; badge.style.display = ''; }
+    else { badge.style.display = 'none'; }
+  } catch (e) { console.error('Delete error:', e); }
+}
+
 </script>
+
+<!-- History Side Panel -->
+<div class="side-panel-overlay" id="history-overlay" onclick="closeHistoryPanel()"></div>
+<div class="side-panel" id="history-panel">
+  <div class="side-panel-header">
+    <div class="side-panel-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span data-i18n="panel_history_title">History</span>
+    </div>
+    <button class="side-panel-close" onclick="closeHistoryPanel()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="side-panel-body" id="history-body">
+    <div class="side-panel-empty">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <p style="font-size:.85rem;font-weight:600" data-i18n="history_login_prompt">Login to save history</p>
+    </div>
+  </div>
+</div>
 </body>
 </html>

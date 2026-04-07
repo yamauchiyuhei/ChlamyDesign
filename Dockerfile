@@ -10,6 +10,9 @@ RUN pip install --prefix=/install --no-cache-dir \
 
 FROM python:3.11-slim
 
+# Install ViennaRNA from pip
+RUN pip install --no-cache-dir ViennaRNA
+
 COPY --from=builder /install /usr/local
 
 WORKDIR /app
