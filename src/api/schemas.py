@@ -14,6 +14,7 @@ class Strategy(str, Enum):
     bfc = "bfc"
     base_ct = "base_ct"
     chlamyct = "chlamyct"
+    chlamydesign = "chlamydesign"
 
 
 # ---------------------------------------------------------------------------
@@ -51,6 +52,10 @@ class PredictResponse(BaseModel):
     num_candidates_generated: int
     start_codon: str
     stop_codon: str
+    five_prime_mfe: Optional[float] = None
+    base_strategy: Optional[str] = None
+    cps_score: Optional[float] = None
+    five_prime_context_score: Optional[float] = None
 
 
 # ---------------------------------------------------------------------------

@@ -17,6 +17,11 @@ from CodonTransformer.CodonPrediction import (
 from CodonTransformer.CodonUtils import ORGANISM2ID
 
 from src.api.config import CHLAMYCT_MODEL_PATH, DATA_CSV, DEFAULT_ORGANISM
+from src.api.services.codon_pair import compute_cps_table
+from src.api.services.five_prime_context import (
+    HIGH_EXPRESSION_GENES,
+    compute_five_prime_bias,
+)
 
 
 class ModelManager:
@@ -32,6 +37,9 @@ class ModelManager:
         # Precomputed at startup (for Chlamydomonas chloroplast)
         self.csi_weights: dict[str, float] = {}
         self.codon_freqs: dict = {}
+        self.cps_table: dict[str, float] = {}
+        self.five_prime_bias: dict[str, float] = {}
+        self.high_expression_count: int = 0
         self.reference_gene_count: int = 0
 
         # Organism list from CodonTransformer
@@ -69,6 +77,17 @@ class ModelManager:
 
         self.csi_weights = get_CSI_weights(dna_list)
         raw_freqs = get_codon_frequencies(dna_list, protein_list)
+        self.cps_table = compute_cps_table(dna_list)
+
+        # 5' context bias from high-expression chloroplast genes only.
+        if "gene" in atg_df.columns:
+            high_expr_df = atg_df[atg_df["gene"].isin(HIGH_EXPRESSION_GENES)]
+            self.high_expression_count = len(high_expr_df)
+            if not high_expr_df.empty:
+                self.five_prime_bias = compute_five_prime_bias(
+                    high_expr_df["dna"].tolist(),
+                    dna_list,
+                )
 
         # Convert AMINO2CODON_TYPE (tuple format) to dict-of-dict format
         # AMINO2CODON_TYPE: Dict[str, Tuple[List[str], List[float]]]
@@ -81,7 +100,10 @@ class ModelManager:
         self._organism_freq_cache[DEFAULT_ORGANISM] = self.codon_freqs
 
         print(f"[ModelManager] Precomputed: {len(self.codon_freqs)} amino acids, "
-              f"{self.reference_gene_count} reference genes")
+              f"{self.reference_gene_count} reference genes, "
+              f"{len(self.cps_table)} codon pairs (CPS table), "
+              f"{len(self.five_prime_bias)} codons (5' bias from "
+              f"{self.high_expression_count} high-expression genes)")
 
     def get_organism_frequencies(self, organism: str) -> dict:
         """Get codon frequencies for a given organism.
