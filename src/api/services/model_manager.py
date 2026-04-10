@@ -10,6 +10,7 @@ import pandas as pd
 import torch
 from CodonTransformer.CodonData import get_codon_frequencies
 from CodonTransformer.CodonEvaluation import get_CSI_weights
+from transformers import BigBirdForMaskedLM
 from CodonTransformer.CodonPrediction import (
     load_model as ct_load_model,
     load_tokenizer,
@@ -32,13 +33,19 @@ class ModelManager:
         self._tokenizer = None
         self._base_model = None
         self._chlamyct_model = None
-        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            self._device = torch.device("mps")
+        elif torch.cuda.is_available():
+            self._device = torch.device("cuda")
+        else:
+            self._device = torch.device("cpu")
 
         # Precomputed at startup (for Chlamydomonas chloroplast)
         self.csi_weights: dict[str, float] = {}
         self.codon_freqs: dict = {}
         self.cps_table: dict[str, float] = {}
         self.five_prime_bias: dict[str, float] = {}
+        self.stop_codon_freqs: dict[str, float] = {}
         self.high_expression_count: int = 0
         self.reference_gene_count: int = 0
 
@@ -88,6 +95,18 @@ class ModelManager:
                     high_expr_df["dna"].tolist(),
                     dna_list,
                 )
+
+        # Compute stop codon frequencies from reference CDS.
+        stop_counts: dict[str, int] = {"TAA": 0, "TAG": 0, "TGA": 0}
+        for dna in cr_df["dna"].tolist():
+            last3 = dna[-3:].upper()
+            if last3 in stop_counts:
+                stop_counts[last3] += 1
+        stop_total = sum(stop_counts.values())
+        if stop_total > 0:
+            self.stop_codon_freqs = {k: v / stop_total for k, v in stop_counts.items()}
+        else:
+            self.stop_codon_freqs = {"TAA": 0.94, "TAG": 0.06, "TGA": 0.00}
 
         # Convert AMINO2CODON_TYPE (tuple format) to dict-of-dict format
         # AMINO2CODON_TYPE: Dict[str, Tuple[List[str], List[float]]]
@@ -160,18 +179,34 @@ class ModelManager:
             with self._lock:
                 if self._chlamyct_model is None:
                     print(f"[ModelManager] Loading ChlamyCT: {CHLAMYCT_MODEL_PATH}")
-                    self._chlamyct_model = ct_load_model(
-                        model_path=CHLAMYCT_MODEL_PATH, device=self._device
-                    )
+                    p = Path(CHLAMYCT_MODEL_PATH)
+                    if p.is_dir():
+                        # Local HuggingFace-format directory (from finetune.py).
+                        model = BigBirdForMaskedLM.from_pretrained(
+                            str(p), local_files_only=True
+                        )
+                        model.eval()
+                        model.to(self._device)
+                        self._chlamyct_model = model
+                    else:
+                        self._chlamyct_model = ct_load_model(
+                            model_path=CHLAMYCT_MODEL_PATH, device=self._device
+                        )
         return self._chlamyct_model
 
     @property
     def chlamyct_available(self) -> bool:
-        """Check if ChlamyCT model path is configured."""
+        """Check if ChlamyCT model weights exist."""
         if not CHLAMYCT_MODEL_PATH:
             return False
         p = Path(CHLAMYCT_MODEL_PATH)
-        return p.exists() or not p.suffix  # local path exists or HF repo ID
+        if p.is_dir():
+            # HuggingFace format: needs config.json at minimum.
+            return (p / "config.json").exists()
+        if p.suffix in (".pt", ".ckpt"):
+            return p.exists()
+        # Assume HuggingFace repo ID (e.g. "user/ChlamyCodonTransformer").
+        return bool(CHLAMYCT_MODEL_PATH)
 
     @property
     def base_model_loaded(self) -> bool:

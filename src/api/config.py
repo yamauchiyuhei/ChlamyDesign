@@ -15,7 +15,10 @@ DATA_CSV = Path(os.getenv(
 
 # Model
 BASE_MODEL_ID = "adibvafa/CodonTransformer"
-CHLAMYCT_MODEL_PATH = os.getenv("CHLAMYCT_MODEL_PATH", "")
+CHLAMYCT_MODEL_PATH = os.getenv(
+    "CHLAMYCT_MODEL_PATH",
+    str(PROJECT_ROOT / "models" / "ChlamyCodonTransformer"),
+)
 DEFAULT_ORGANISM = "Chlamydomonas reinhardtii chloroplast"
 
 # Limits

@@ -21,7 +21,34 @@ from src.api.services.model_manager import manager
 
 logger = logging.getLogger(__name__)
 
-TARGET_GC = 34.0
+TARGET_GC_CHLOROPLAST = 34.0
+
+# Organism-specific GC% targets for candidate selection. Falls back to a
+# rough estimate from codon frequencies when organism is not listed.
+_ORGANISM_GC_TARGETS: dict[str, float] = {
+    "Chlamydomonas reinhardtii chloroplast": 34.0,
+}
+
+
+def _target_gc(organism: str) -> float:
+    """Return organism-specific GC% target for candidate re-ranking."""
+    if organism in _ORGANISM_GC_TARGETS:
+        return _ORGANISM_GC_TARGETS[organism]
+    # Estimate from codon frequencies if available.
+    try:
+        freqs = manager.get_organism_frequencies(organism)
+        gc_sum = 0.0
+        total = 0.0
+        for aa, codons in freqs.items():
+            for codon, freq in codons.items():
+                gc_count = sum(1 for b in codon if b in "GC")
+                gc_sum += gc_count * freq
+                total += 3 * freq
+        if total > 0:
+            return gc_sum / total * 100
+    except Exception:
+        pass
+    return 50.0  # Default when nothing is known
 # Window for 5' end MFE re-ranking (Kudla et al. Science 2009: -4 to +37 nt
 # around start codon → ~40 nt within CDS; use 47 nt for safety margin).
 FIVE_PRIME_WINDOW_NT = 47
@@ -132,12 +159,13 @@ def _predict_ct(
     )
 
     if num_sequences > 1:
+        target_gc = _target_gc(organism)
         best = min(
             result,
             key=lambda r: abs(
                 sum(1 for b in r.predicted_dna if b in "GC")
                 / len(r.predicted_dna) * 100
-                - TARGET_GC
+                - target_gc
             ),
         )
         return best.predicted_dna
@@ -170,8 +198,17 @@ def _predict_freq(protein: str, strategy: Strategy, organism: str) -> str:
             freq_list[-1] = 1.0 - s
         amino2codon[aa] = (codon_list, freq_list)
 
-    # Add stop codon mapping
-    amino2codon["_"] = (["TAA", "TAG", "TGA"], [0.50, 0.30, 0.20])
+    # Add stop codon mapping from precomputed organism-specific frequencies.
+    sf = manager.stop_codon_freqs
+    if sf:
+        stop_codons = list(sf.keys())
+        stop_freqs = list(sf.values())
+        # Ensure sum = 1.0
+        s = sum(stop_freqs[:-1])
+        stop_freqs[-1] = 1.0 - s
+        amino2codon["_"] = (stop_codons, stop_freqs)
+    else:
+        amino2codon["_"] = (["TAA", "TAG", "TGA"], [0.94, 0.06, 0.00])
 
     if strategy == Strategy.cai_max:
         return get_high_frequency_choice_sequence(clean_protein + "_", amino2codon)
@@ -251,18 +288,20 @@ def _predict_chlamydesign(
     cps_values: list[float] = [score_cps(d, cps_table) for d in dnas]
     ctx_values: list[float] = [score_five_prime_context(d, bias_table) for d in dnas]
     gc_distances: list[float] = [
-        abs(sum(1 for b in d if b in "GC") / len(d) * 100 - TARGET_GC) for d in dnas
+        abs(sum(1 for b in d if b in "GC") / len(d) * 100 - _target_gc(organism))
+        for d in dnas
     ]
 
     mfe_available = any(m is not None for m in mfes)
-    cps_available = bool(cps_table) and any(v != 0.0 for v in cps_values)
-    ctx_available = bool(bias_table) and any(v != 0.0 for v in ctx_values)
+    cps_available = bool(cps_table)
+    ctx_available = bool(bias_table)
 
     # Combined z-score across whichever objectives are available.
     objective_terms: list[tuple[list[float], float]] = []
     if mfe_available:
         valid_mfes = [m for m in mfes if m is not None]
-        fallback_mfe = min(valid_mfes) if valid_mfes else 0.0
+        # Use mean as fallback for None values (neutral, not penalizing).
+        fallback_mfe = sum(valid_mfes) / len(valid_mfes) if valid_mfes else 0.0
         mfe_filled = [m if m is not None else fallback_mfe for m in mfes]
         objective_terms.append((_zscores(mfe_filled), CHLAMYDESIGN_W_MFE))
     if cps_available:

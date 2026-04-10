@@ -345,6 +345,12 @@ textarea.error {
 .strategy-tag.stoch-tag { background: var(--amber-lt); color: var(--amber); }
 .strategy-tag.api-tag { background: var(--blue-lt); color: var(--blue); }
 .strategy-tag.bio-tag { background: var(--purple-lt); color: var(--purple); }
+.chlamydesign-info {
+  display: none; font-size: .76rem; color: var(--text-secondary); line-height: 1.5;
+  padding: 10px 14px; background: var(--purple-lt); border-radius: var(--radius-sm);
+  border-left: 3px solid var(--purple); margin-bottom: 16px;
+}
+.chlamydesign-info.visible { display: block; animation: fadeIn .2s ease; }
 
 /* Strategy description (collapsible) */
 .strategy-detail {
@@ -1058,6 +1064,7 @@ footer a:hover { text-decoration: underline; }
 
       <!-- Results -->
       <div id="results">
+        <div class="chlamydesign-info" id="chlamydesign-info"></div>
         <div class="result-section">
           <div class="result-section-title" data-i18n="card_metrics">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
@@ -1350,7 +1357,7 @@ const I18N = {
     err_dna_short: 'DNA must be at least 9 nt (3 codons).',
     err_dna_long_opt: 'DNA too long (max 9000 nt).',
     card_strategy: 'Strategy', strategy_detail_toggle: "What's the difference?",
-    strategy_desc: '<strong>CAI-max</strong> — Always picks the most frequent codon (maximum adaptation).<br><strong>BFC</strong> — Samples codons proportionally to natural frequency.<br><strong>Base CT</strong> — CodonTransformer deep learning model (164 organisms).<br><strong>ChlamyCT</strong> — Fine-tuned for <em>C. reinhardtii</em> chloroplast.<br><strong>ChlamyDesign</strong> — ChlamyCT + 3 biological inductive biases: (1) 5\' mRNA structure minimization (Kudla 2009), (2) codon-pair score maximization (Coleman 2008), (3) 5\' codon context preservation from high-expression chloroplast genes (translational activator binding). Re-ranks candidates by combined z-score.',
+    strategy_desc: '<strong>CAI-max</strong> — Always picks the most frequent codon (maximum adaptation).<br><strong>BFC</strong> — Samples codons proportionally to natural frequency.<br><strong>Base CT</strong> — CodonTransformer deep learning model (164 organisms).<br><strong>ChlamyCT</strong> — Fine-tuned for <em>C. reinhardtii</em> chloroplast.<br><strong>ChlamyDesign</strong> — 3 biological inductive biases: (1) 5\' mRNA structure minimization (Kudla 2009), (2) codon-pair score maximization (Coleman 2008), (3) 5\' codon context preservation from high-expression chloroplast genes (translational activator binding). Re-ranks candidates by combined z-score. Uses ChlamyCT when available, falls back to Base CT otherwise.',
     slider_candidates: 'Candidates', slider_temperature: 'Temperature',
     btn_optimize: 'Optimize', btn_generating: 'Generating...', btn_optimizing: 'Optimizing...',
     shortcut_hint: 'Cmd+Enter',
@@ -1423,7 +1430,7 @@ const I18N = {
     err_dna_short: 'DNAは最低9 nt（3コドン）必要です。',
     err_dna_long_opt: 'DNAが長すぎます（最大9000 nt）。',
     card_strategy: '最適化戦略', strategy_detail_toggle: '戦略の違いは？',
-    strategy_desc: '<strong>CAI-max</strong> — 最高頻度コドンを常に選択（最大適応度）。<br><strong>BFC</strong> — 自然頻度に比例して確率的に選択。<br><strong>Base CT</strong> — CodonTransformer深層学習モデル（164生物種）。<br><strong>ChlamyCT</strong> — <em>C. reinhardtii</em> 葉緑体に特化。<br><strong>ChlamyDesign</strong> — ChlamyCT に 3 つの生物学的制約を後付け: ① 5\' 末端 mRNA 二次構造最小化（Kudla 2009）、② コドンペアスコア最大化（Coleman 2008、tRNA プール制約）、③ 高発現葉緑体遺伝子の 5\' コドン文脈保存（翻訳活性化因子結合部位）。合成 z スコアで再ランキング。',
+    strategy_desc: '<strong>CAI-max</strong> — 最高頻度コドンを常に選択（最大適応度）。<br><strong>BFC</strong> — 自然頻度に比例して確率的に選択。<br><strong>Base CT</strong> — CodonTransformer深層学習モデル（164生物種）。<br><strong>ChlamyCT</strong> — <em>C. reinhardtii</em> 葉緑体に特化。<br><strong>ChlamyDesign</strong> — 3 つの生物学的制約: ① 5\' 末端 mRNA 二次構造最小化（Kudla 2009）、② コドンペアスコア最大化（Coleman 2008、tRNA プール制約）、③ 高発現葉緑体遺伝子の 5\' コドン文脈保存（翻訳活性化因子結合部位）。合成 z スコアで再ランキング。ChlamyCT 利用可能時はそれを使用、なければ Base CT で代替。',
     slider_candidates: '候補数', slider_temperature: '温度',
     btn_optimize: '最適化', btn_generating: 'AI生成中...', btn_optimizing: '最適化中...',
     shortcut_hint: 'Cmd+Enter',
@@ -1678,16 +1685,24 @@ const VALID_AA=new Set('ACDEFGHIKLMNPQRSTVWY');
 const CT_STRATEGIES=['base_ct','chlamyct','chlamydesign'];
 let lastDNA='',lastProtein='',apiAvailable=false;
 
+let chlamyctModelAvailable=false;
 async function checkAPIHealth(retries=2){
   const dot=document.getElementById('api-dot'),label=document.getElementById('api-label');
   dot.classList.remove('online','offline');label.textContent=t('api_checking');
   for(let i=0;i<=retries;i++){
     try{const c=new AbortController();setTimeout(()=>c.abort(),8000);
       const r=await fetch('/api/health',{signal:c.signal});if(r.ok){const d=await r.json();
-      if(d.status==='ok'){apiAvailable=true;dot.classList.remove('offline');dot.classList.add('online');label.textContent=t('api_online');enableCTPills();return;}}}catch(e){}
+      if(d.status==='ok'){apiAvailable=true;dot.classList.remove('offline');dot.classList.add('online');label.textContent=t('api_online');enableCTPills();checkChlamyCTAvailability();return;}}}catch(e){}
     if(i<retries) await new Promise(r=>setTimeout(r,2000));
   }
   apiAvailable=false;dot.classList.remove('online');dot.classList.add('offline');label.textContent=t('api_offline');disableCTPills();
+}
+async function checkChlamyCTAvailability(){
+  try{const r=await fetch('/api/info');if(r.ok){const d=await r.json();
+    const ct=d.models&&d.models.find(m=>m.name==='ChlamyCodonTransformer');
+    chlamyctModelAvailable=ct&&ct.available;
+    if(!chlamyctModelAvailable){const p=document.getElementById('pill-chlamyct');p.classList.add('disabled');p.querySelector('input').disabled=true;p.title=currentLang==='ja'?'モデル未ロード':'Model not loaded';}
+  }}catch(e){}
 }
 function enableCTPills(){document.getElementById('pill-basect').classList.remove('disabled');document.getElementById('pill-basect').querySelector('input').disabled=false;const c=document.getElementById('pill-chlamyct');c.classList.remove('disabled');c.querySelector('input').disabled=false;const d=document.getElementById('pill-chlamydesign');d.classList.remove('disabled');d.querySelector('input').disabled=false;}
 function disableCTPills(){document.getElementById('pill-basect').classList.add('disabled');document.getElementById('pill-basect').querySelector('input').disabled=true;document.getElementById('pill-chlamyct').classList.add('disabled');document.getElementById('pill-chlamyct').querySelector('input').disabled=true;document.getElementById('pill-chlamydesign').classList.add('disabled');document.getElementById('pill-chlamydesign').querySelector('input').disabled=true;}
@@ -1753,7 +1768,7 @@ const isCT=CT_STRATEGIES.includes(strategy);const core=protein.replace(/[_*]$/,'
 if(needsAPI&&!apiAvailable){showError(t('err_api')+'API offline.');btn.disabled=false;return;}
 if(needsAPI){btn.innerHTML='<span class="spinner"></span> '+t(isCT?'btn_generating':'btn_optimizing');
   try{const body={protein:proteinWithStop,strategy,organism:selectedOrganism};if(isCT){body.num_sequences=parseInt(document.getElementById('slider-seqs').value);body.temperature=parseFloat(document.getElementById('slider-temp').value);}
-  const result=await callAPI('predict',body);lastDNA=result.predicted_dna;lastProtein=core;showResults(lastDNA,core,strategy);fetchExtendedMetrics(lastDNA);
+  const result=await callAPI('predict',body);lastDNA=result.predicted_dna;lastProtein=core;showResults(lastDNA,core,strategy,result);fetchExtendedMetrics(lastDNA);
   saveHistory('optimize',{organism:selectedOrganism,strategy,proteinInput:proteinWithStop,dnaOutput:lastDNA,gcPercent:calcGC(lastDNA),csi:calcCSI(lastDNA),lengthNt:lastDNA.length,lengthAa:core.length,startCodon:lastDNA.slice(0,3),stopCodon:lastDNA.slice(-3)});}catch(e){showError(t('err_api')+(e.message||'Unknown'));}finally{resetButton();}}
 else{btn.innerHTML='<span class="spinner"></span> '+t('btn_optimizing');setTimeout(()=>{try{const dna=optimizeLocal(core,strategy);lastDNA=dna;lastProtein=core;showResults(dna,core,strategy);if(apiAvailable)fetchExtendedMetrics(dna);
   saveHistory('optimize',{organism:selectedOrganism,strategy,proteinInput:core+'_',dnaOutput:dna,gcPercent:calcGC(dna),csi:calcCSI(dna),lengthNt:dna.length,lengthAa:core.length,startCodon:dna.slice(0,3),stopCodon:dna.slice(-3)});}finally{resetButton();}},30);}}
@@ -1762,11 +1777,14 @@ function resetButton(){const btn=document.getElementById('run-btn');btn.disabled
 
 async function fetchExtendedMetrics(dna){try{const r=await callAPI('evaluate',{dna_sequence:dna,organism:selectedOrganism});showExtendedMetrics(r);}catch(e){}}
 
-function showResults(dna,protein,strategy){const gc=calcGC(dna);const csi=calcCSI(dna);const ntLen=dna.length;const aaLen=protein.length;const start=dna.slice(0,3);const stop=dna.slice(-3);
+function showResults(dna,protein,strategy,apiResult){const gc=calcGC(dna);const csi=calcCSI(dna);const ntLen=dna.length;const aaLen=protein.length;const start=dna.slice(0,3);const stop=dna.slice(-3);
 document.getElementById('m-gc').textContent=gc.toFixed(1)+'%';const gcPct=Math.min(gc/70*100,100);const gcBar=document.getElementById('m-gc-bar');gcBar.style.width=gcPct+'%';gcBar.className='metric-bar-fill'+(gc>55?' bad':gc>42?' warn':'');
 document.getElementById('m-len').textContent=ntLen+' nt';document.getElementById('m-len-sub').textContent=aaLen+' aa · '+(ntLen/3|0)+' codons';
 document.getElementById('m-csi').textContent=csi.toFixed(3);document.getElementById('m-csi-bar').style.width=(csi*100)+'%';
 document.getElementById('m-startstop').textContent=start+' / '+stop;const ok=(start==='ATG'||start==='GTG')&&STOP_CODONS.includes(stop);document.getElementById('m-startstop-sub').textContent=ok?t('metric_startstop_valid'):t('metric_startstop_check');document.getElementById('m-startstop-sub').style.color=ok?'var(--green)':'var(--amber)';
+/* ChlamyDesign: show base_strategy and biological scores */
+const bioInfo=document.getElementById('chlamydesign-info');
+if(strategy==='chlamydesign'&&apiResult){const bs=apiResult.base_strategy||'base_ct';const parts=[(currentLang==='ja'?'ベースモデル: ':'Base model: ')+'<strong>'+(bs==='chlamyct'?'ChlamyCT':'Base CT')+'</strong>'];if(apiResult.five_prime_mfe!=null)parts.push("5' MFE: "+apiResult.five_prime_mfe.toFixed(2)+' kcal/mol');if(apiResult.cps_score!=null)parts.push('CPS: '+apiResult.cps_score.toFixed(4));if(apiResult.five_prime_context_score!=null)parts.push((currentLang==='ja'?"5'文脈: ":"5' ctx: ")+apiResult.five_prime_context_score.toFixed(3));bioInfo.innerHTML=parts.join(' · ');bioInfo.classList.add('visible');}else{bioInfo.classList.remove('visible');bioInfo.innerHTML='';}
 hideExtendedMetrics();
 const codons=[];for(let i=0;i<dna.length;i+=3)codons.push(dna.slice(i,i+3));document.getElementById('dna-colored').innerHTML=codons.map(c=>`<span class="codon">${c}</span>`).join('');
 document.getElementById('results').classList.add('visible');document.getElementById('results').scrollIntoView({behavior:'smooth',block:'nearest'});}

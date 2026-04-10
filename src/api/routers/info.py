@@ -18,7 +18,7 @@ async def info_endpoint() -> InfoResponse:
         organism=DEFAULT_ORGANISM,
         gc_target=34.0,
         reference_genes=manager.reference_gene_count,
-        strategies=["cai_max", "bfc", "base_ct", "chlamyct"],
+        strategies=["cai_max", "bfc", "base_ct", "chlamyct", "chlamydesign"],
         models=[
             ModelStatus(
                 name="Base CodonTransformer",
