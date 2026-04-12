@@ -1,0 +1,28 @@
+# Override .gitignore for Cloud Build
+# Include models/ChlamyCodonTransformer (needed for API)
+
+.git
+.github
+.firebase
+.claude
+__pycache__
+*.pyc
+*.pyo
+notebooks/
+results/
+data/raw/
+docs/
+*.md
+*.ipynb
+.firebaserc
+firebase.json
+LICENSE
+src/web/
+
+# Exclude model checkpoints and training artifacts, but keep the model itself
+models/*/checkpoint-*
+models/*/optimizer.pt
+models/*/rng_state.pth
+models/*/scheduler.pt
+models/*/training_args.bin
+models/ChlamyCodonTransformer/ChlamyCodonTransformer/

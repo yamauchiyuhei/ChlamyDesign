@@ -358,7 +358,7 @@ textarea.error {
   max-height: 0; opacity: 0;
   transition: max-height .3s ease, opacity .2s ease, margin .2s ease;
 }
-.strategy-detail.open { max-height: 200px; opacity: 1; }
+.strategy-detail.open { max-height: 2000px; opacity: 1; }
 .strategy-detail-inner {
   font-size: .78rem; color: var(--text-secondary); line-height: 1.6;
   padding: 12px 14px; background: var(--bg); border-radius: var(--radius-sm);
@@ -1039,11 +1039,11 @@ footer a:hover { text-decoration: underline; }
           <div class="strategy-detail-inner" id="strategy-desc"></div>
         </div>
 
-        <div class="slider-panel" id="slider-panel">
+        <div class="slider-panel" id="slider-panel" style="display:none">
           <div class="slider-row">
             <span class="slider-label" data-i18n="slider_candidates">Candidates</span>
-            <input type="range" id="slider-seqs" min="1" max="20" value="1" step="1">
-            <span class="slider-val" id="val-seqs">1</span>
+            <input type="range" id="slider-seqs" min="1" max="20" value="10" step="1">
+            <span class="slider-val" id="val-seqs">10</span>
           </div>
           <div class="slider-row">
             <span class="slider-label" data-i18n="slider_temperature">Temperature</span>
@@ -1357,7 +1357,22 @@ const I18N = {
     err_dna_short: 'DNA must be at least 9 nt (3 codons).',
     err_dna_long_opt: 'DNA too long (max 9000 nt).',
     card_strategy: 'Strategy', strategy_detail_toggle: "What's the difference?",
-    strategy_desc: '<strong>CAI-max</strong> — Always picks the most frequent codon (maximum adaptation).<br><strong>BFC</strong> — Samples codons proportionally to natural frequency.<br><strong>Base CT</strong> — CodonTransformer deep learning model (164 organisms).<br><strong>ChlamyCT</strong> — Fine-tuned for <em>C. reinhardtii</em> chloroplast.<br><strong>ChlamyDesign</strong> — 3 biological inductive biases: (1) 5\' mRNA structure minimization (Kudla 2009), (2) codon-pair score maximization (Coleman 2008), (3) 5\' codon context preservation from high-expression chloroplast genes (translational activator binding). Re-ranks candidates by combined z-score. Uses ChlamyCT when available, falls back to Base CT otherwise.',
+    strategy_desc: '\
+<div style="display:flex;flex-direction:column;gap:14px;font-size:13.5px;line-height:1.65">\
+<div><strong style="color:#f39c12">⬤ CAI-max</strong> — <em>Codon Adaptation Index maximization.</em><br>\
+For each amino acid, always selects the single most frequently used codon in the selected organism. Produces deterministic, highly biased sequences. Maximizes CAI/CSI score but can deplete the tRNA pool and cause ribosome stalling. Supports all 164 organisms. Best used as a benchmark, not for actual expression.</div>\
+<div><strong style="color:#9b59b6">⬤ BFC</strong> <span style="background:#f0e6ff;color:#7c3aed;padding:1px 6px;border-radius:4px;font-size:11px">STOCHASTIC</span> — <em>Background Frequency Codon selection.</em><br>\
+Samples each codon randomly in proportion to its natural usage frequency in the selected organism. Produces different sequences each run (stochastic). Preserves natural codon diversity and tRNA balance. GC% naturally matches the organism. Supports all 164 organisms.</div>\
+<div><strong style="color:#3498db">⬤ Base CT</strong> <span style="background:#dbeafe;color:#2563eb;padding:1px 6px;border-radius:4px;font-size:11px">API</span> — <em>CodonTransformer base model.</em><br>\
+A BigBird Transformer (89.6M params) pre-trained on ~1 million genes from 164 organisms via masked language modeling (MLM). Captures context-dependent codon patterns including codon-pair preferences, mRNA structure effects, and organism-specific usage. However, it was trained on all organisms equally — its output tends to have higher GC% (~61%) than optimal for AT-rich chloroplast genomes (~34%).</div>\
+<div><strong style="color:#e74c3c">⬤ ChlamyCT</strong> <span style="background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:4px;font-size:11px">API</span> — <em>ChlamyCodonTransformer, fine-tuned model.</em><br>\
+The Base CT model fine-tuned on 1,384 chloroplast CDS from <em>C. reinhardtii</em> and 15 related green algae species (Volvox, Dunaliella, Chlorella, etc.), following the protocol in Fallahpour et al. (2025). Training: 15 epochs, batch size 6, lr 5e-5, MLM objective. Learns chloroplast-specific codon patterns to better match the AT-rich codon usage of plastid genomes.</div>\
+<div><strong style="color:#8b5cf6">⬤ ChlamyDesign</strong> <span style="background:#f3e8ff;color:#7c3aed;padding:1px 6px;border-radius:4px;font-size:11px">BIO</span> — <em>Knowledge-driven biological optimization.</em><br>\
+Generates multiple candidates using ChlamyCT (or Base CT as fallback), then re-ranks them by three biological objectives combined via z-score normalization (equal weight 1/3 each):<br>\
+&nbsp;&nbsp;① <strong>5′ mRNA structure minimization</strong> — Minimizes RNA secondary structure (MFE) in the first 47 nt of CDS (Kudla et al. 2009). Strong 5′ structure inhibits ribosome binding and translation initiation.<br>\
+&nbsp;&nbsp;② <strong>Codon pair score (CPS) maximization</strong> — Maximizes adjacent codon-pair compatibility based on the chloroplast tRNA pool (Coleman et al. 2008). Codon pairs that match available tRNA abundance improve translational elongation efficiency.<br>\
+&nbsp;&nbsp;③ <strong>5′ codon context preservation</strong> — Preserves the codon usage bias found in the first 10 codons of highly expressed chloroplast genes (rbcL, psbA, psaA, atpA, etc.). These positions are critical for translational activator binding in chloroplast mRNA.</div>\
+</div>',
     slider_candidates: 'Candidates', slider_temperature: 'Temperature',
     btn_optimize: 'Optimize', btn_generating: 'Generating...', btn_optimizing: 'Optimizing...',
     shortcut_hint: 'Cmd+Enter',
@@ -1430,7 +1445,22 @@ const I18N = {
     err_dna_short: 'DNAは最低9 nt（3コドン）必要です。',
     err_dna_long_opt: 'DNAが長すぎます（最大9000 nt）。',
     card_strategy: '最適化戦略', strategy_detail_toggle: '戦略の違いは？',
-    strategy_desc: '<strong>CAI-max</strong> — 最高頻度コドンを常に選択（最大適応度）。<br><strong>BFC</strong> — 自然頻度に比例して確率的に選択。<br><strong>Base CT</strong> — CodonTransformer深層学習モデル（164生物種）。<br><strong>ChlamyCT</strong> — <em>C. reinhardtii</em> 葉緑体に特化。<br><strong>ChlamyDesign</strong> — 3 つの生物学的制約: ① 5\' 末端 mRNA 二次構造最小化（Kudla 2009）、② コドンペアスコア最大化（Coleman 2008、tRNA プール制約）、③ 高発現葉緑体遺伝子の 5\' コドン文脈保存（翻訳活性化因子結合部位）。合成 z スコアで再ランキング。ChlamyCT 利用可能時はそれを使用、なければ Base CT で代替。',
+    strategy_desc: '\
+<div style="display:flex;flex-direction:column;gap:14px;font-size:13.5px;line-height:1.65">\
+<div><strong style="color:#f39c12">⬤ CAI-max</strong> — <em>コドン適応度指数の最大化。</em><br>\
+各アミノ酸に対して、選択した生物種で最も使用頻度の高いコドンを常に選択します。決定論的で偏りの強い配列を生成します。CAI/CSIスコアは最大になりますが、tRNAプールの枯渇やリボソームの停滞を引き起こす可能性があります。全164生物種に対応。ベンチマーク用途に最適です。</div>\
+<div><strong style="color:#9b59b6">⬤ BFC</strong> <span style="background:#f0e6ff;color:#7c3aed;padding:1px 6px;border-radius:4px;font-size:11px">確率的</span> — <em>背景頻度コドン選択。</em><br>\
+選択した生物種における自然なコドン使用頻度に比例して、各コドンをランダムにサンプリングします。実行ごとに異なる配列を生成（確率的）。自然なコドン多様性とtRNAバランスを維持し、GC%は自然に生物種固有の値に近づきます。全164生物種に対応。</div>\
+<div><strong style="color:#3498db">⬤ Base CT</strong> <span style="background:#dbeafe;color:#2563eb;padding:1px 6px;border-radius:4px;font-size:11px">API</span> — <em>CodonTransformer ベースモデル。</em><br>\
+164生物種の約100万遺伝子でマスク言語モデリング（MLM）により事前学習された BigBird Transformer（8,960万パラメータ）。コドンペア選好性、mRNA構造効果、生物種特異的使用パターンなど、文脈依存的なコドンパターンを学習しています。ただし全生物種を均等に学習しているため、AT-richな葉緑体ゲノム（~34%）に対してGC%が高め（~61%）になる傾向があります。</div>\
+<div><strong style="color:#e74c3c">⬤ ChlamyCT</strong> <span style="background:#fee2e2;color:#dc2626;padding:1px 6px;border-radius:4px;font-size:11px">API</span> — <em>ChlamyCodonTransformer、ファインチューニング済みモデル。</em><br>\
+Base CTモデルを <em>C. reinhardtii</em> および近縁緑藻15種（Volvox, Dunaliella, Chlorella等）の葉緑体CDS 1,384配列でファインチューニング。Fallahpour et al. (2025) のプロトコルに準拠し、15エポック、バッチサイズ6、学習率5e-5、MLM目的関数で学習。色素体ゲノムのAT-richなコドン使用パターンをより正確に反映します。</div>\
+<div><strong style="color:#8b5cf6">⬤ ChlamyDesign</strong> <span style="background:#f3e8ff;color:#7c3aed;padding:1px 6px;border-radius:4px;font-size:11px">BIO</span> — <em>知識駆動型生物学的最適化。</em><br>\
+ChlamyCT（またはBase CT）で複数の候補配列を生成し、3つの生物学的目的関数のzスコア正規化合成（各1/3の重み）で再ランキングします：<br>\
+&nbsp;&nbsp;① <strong>5′ mRNA二次構造の最小化</strong> — CDS先頭47 ntのRNA二次構造（MFE）を最小化（Kudla et al. 2009）。5′末端の強い二次構造はリボソーム結合と翻訳開始を阻害します。<br>\
+&nbsp;&nbsp;② <strong>コドンペアスコア（CPS）の最大化</strong> — 葉緑体tRNAプールに基づく隣接コドンペアの適合性を最大化（Coleman et al. 2008）。利用可能なtRNA量に適合するコドンペアは翻訳伸長効率を向上させます。<br>\
+&nbsp;&nbsp;③ <strong>5′コドン文脈の保存</strong> — 高発現葉緑体遺伝子（rbcL, psbA, psaA, atpA等）の先頭10コドンに見られるコドン使用バイアスを保存。これらの位置は葉緑体mRNAの翻訳活性化因子の結合に重要です。</div>\
+</div>',
     slider_candidates: '候補数', slider_temperature: '温度',
     btn_optimize: '最適化', btn_generating: 'AI生成中...', btn_optimizing: '最適化中...',
     shortcut_hint: 'Cmd+Enter',
@@ -1686,14 +1716,14 @@ const CT_STRATEGIES=['base_ct','chlamyct','chlamydesign'];
 let lastDNA='',lastProtein='',apiAvailable=false;
 
 let chlamyctModelAvailable=false;
-async function checkAPIHealth(retries=2){
+async function checkAPIHealth(retries=4){
   const dot=document.getElementById('api-dot'),label=document.getElementById('api-label');
   dot.classList.remove('online','offline');label.textContent=t('api_checking');
   for(let i=0;i<=retries;i++){
-    try{const c=new AbortController();setTimeout(()=>c.abort(),8000);
+    try{const c=new AbortController();setTimeout(()=>c.abort(),30000);
       const r=await fetch('/api/health',{signal:c.signal});if(r.ok){const d=await r.json();
       if(d.status==='ok'){apiAvailable=true;dot.classList.remove('offline');dot.classList.add('online');label.textContent=t('api_online');enableCTPills();checkChlamyCTAvailability();return;}}}catch(e){}
-    if(i<retries) await new Promise(r=>setTimeout(r,2000));
+    if(i<retries) await new Promise(r=>setTimeout(r,3000));
   }
   apiAvailable=false;dot.classList.remove('online');dot.classList.add('offline');label.textContent=t('api_offline');disableCTPills();
 }
@@ -1707,7 +1737,7 @@ async function checkChlamyCTAvailability(){
 function enableCTPills(){document.getElementById('pill-basect').classList.remove('disabled');document.getElementById('pill-basect').querySelector('input').disabled=false;const c=document.getElementById('pill-chlamyct');c.classList.remove('disabled');c.querySelector('input').disabled=false;const d=document.getElementById('pill-chlamydesign');d.classList.remove('disabled');d.querySelector('input').disabled=false;}
 function disableCTPills(){document.getElementById('pill-basect').classList.add('disabled');document.getElementById('pill-basect').querySelector('input').disabled=true;document.getElementById('pill-chlamyct').classList.add('disabled');document.getElementById('pill-chlamyct').querySelector('input').disabled=true;document.getElementById('pill-chlamydesign').classList.add('disabled');document.getElementById('pill-chlamydesign').querySelector('input').disabled=true;}
 
-disableCTPills();checkAPIHealth();loadOrganisms();orgSearch.value='';updateOrganismUI();
+selectedOrganism='Chlamydomonas reinhardtii chloroplast';disableCTPills();checkAPIHealth();loadOrganisms();orgSearch.value=selectedOrganism;updateOrganismUI();
 
 document.getElementById('seq-input').addEventListener('input',function(){
   clearError(); document.getElementById('results').classList.remove('visible');
@@ -1726,9 +1756,7 @@ document.getElementById('seq-input').addEventListener('input',function(){
     document.getElementById('translated-preview').classList.remove('visible');
   }
 });
-document.querySelectorAll('input[name="strategy"]').forEach(r=>{r.addEventListener('change',function(){document.getElementById('slider-panel').classList.toggle('visible',CT_STRATEGIES.includes(this.value));if(this.value==='chlamydesign'){const s=document.getElementById('slider-seqs');if(parseInt(s.value)<5){s.value=10;document.getElementById('val-seqs').textContent='10';}}});});
-document.getElementById('slider-seqs').addEventListener('input',function(){document.getElementById('val-seqs').textContent=this.value;});
-document.getElementById('slider-temp').addEventListener('input',function(){document.getElementById('val-temp').textContent=parseFloat(this.value).toFixed(1);});
+document.querySelectorAll('input[name="strategy"]').forEach(r=>{r.addEventListener('change',function(){document.getElementById('slider-panel').classList.remove('visible');});});
 document.getElementById('sa-dna-input').addEventListener('input',function(){document.getElementById('sa-seq-len').textContent=this.value.replace(/[^ATGCatgc]/g,'').length+' nt';});
 document.getElementById('pa-protein-input').addEventListener('input',function(){document.getElementById('pa-seq-len').textContent=this.value.trim().toUpperCase().replace(/[^A-Z]/g,'').length+' aa';});
 
@@ -1767,7 +1795,7 @@ const strategy=document.querySelector('input[name="strategy"]:checked').value;co
 const isCT=CT_STRATEGIES.includes(strategy);const core=protein.replace(/[_*]$/,'');const proteinWithStop=core+'_';const needsAPI=isCT||!clientCodonFreq;
 if(needsAPI&&!apiAvailable){showError(t('err_api')+'API offline.');btn.disabled=false;return;}
 if(needsAPI){btn.innerHTML='<span class="spinner"></span> '+t(isCT?'btn_generating':'btn_optimizing');
-  try{const body={protein:proteinWithStop,strategy,organism:selectedOrganism};if(isCT){body.num_sequences=parseInt(document.getElementById('slider-seqs').value);body.temperature=parseFloat(document.getElementById('slider-temp').value);}
+  try{const body={protein:proteinWithStop,strategy,organism:selectedOrganism};if(strategy==='chlamydesign'){body.num_sequences=10;body.temperature=0.2;}else if(isCT){body.num_sequences=1;body.temperature=0.2;}
   const result=await callAPI('predict',body);lastDNA=result.predicted_dna;lastProtein=core;showResults(lastDNA,core,strategy,result);fetchExtendedMetrics(lastDNA);
   saveHistory('optimize',{organism:selectedOrganism,strategy,proteinInput:proteinWithStop,dnaOutput:lastDNA,gcPercent:calcGC(lastDNA),csi:calcCSI(lastDNA),lengthNt:lastDNA.length,lengthAa:core.length,startCodon:lastDNA.slice(0,3),stopCodon:lastDNA.slice(-3)});}catch(e){showError(t('err_api')+(e.message||'Unknown'));}finally{resetButton();}}
 else{btn.innerHTML='<span class="spinner"></span> '+t('btn_optimizing');setTimeout(()=>{try{const dna=optimizeLocal(core,strategy);lastDNA=dna;lastProtein=core;showResults(dna,core,strategy);if(apiAvailable)fetchExtendedMetrics(dna);

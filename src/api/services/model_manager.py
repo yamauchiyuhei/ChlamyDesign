@@ -17,7 +17,7 @@ from CodonTransformer.CodonPrediction import (
 )
 from CodonTransformer.CodonUtils import ORGANISM2ID
 
-from src.api.config import CHLAMYCT_MODEL_PATH, DATA_CSV, DEFAULT_ORGANISM
+from src.api.config import BASE_MODEL_LOCAL, CHLAMYCT_MODEL_PATH, DATA_CSV, DEFAULT_ORGANISM
 from src.api.services.codon_pair import compute_cps_table
 from src.api.services.five_prime_context import (
     HIGH_EXPRESSION_GENES,
@@ -161,14 +161,28 @@ class ModelManager:
         return self._tokenizer
 
     def get_base_model(self):
-        """Get base CodonTransformer model (lazy-loaded, thread-safe)."""
+        """Get base CodonTransformer model (lazy-loaded, thread-safe).
+
+        Prefers local HuggingFace-format directory to avoid HuggingFace Hub
+        rate limits on Cloud Run. Falls back to Hub download if local not found.
+        """
         if self._base_model is None:
             with self._lock:
                 if self._base_model is None:
-                    print(f"[ModelManager] Loading base model from HuggingFace...")
-                    self._base_model = ct_load_model(
-                        model_path=None, device=self._device
-                    )
+                    local_path = Path(BASE_MODEL_LOCAL)
+                    if local_path.is_dir() and (local_path / "config.json").exists():
+                        print(f"[ModelManager] Loading base model from local: {local_path}")
+                        model = BigBirdForMaskedLM.from_pretrained(
+                            str(local_path), local_files_only=True
+                        )
+                        model.eval()
+                        model.to(self._device)
+                        self._base_model = model
+                    else:
+                        print("[ModelManager] Loading base model from HuggingFace Hub...")
+                        self._base_model = ct_load_model(
+                            model_path=None, device=self._device
+                        )
         return self._base_model
 
     def get_chlamyct_model(self) -> Optional[Any]:

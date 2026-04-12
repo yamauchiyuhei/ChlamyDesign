@@ -257,7 +257,12 @@ def main() -> None:
     OUTPUT_CSV.parent.mkdir(parents=True, exist_ok=True)
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        device = torch.device("mps")
+    elif torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
     print(f"デバイス: {device}")
 
     # --- データ読み込み ---
@@ -291,9 +296,28 @@ def main() -> None:
     chlamyct_model = None
     if args.model:
         print("  ChlamyCodonTransformerを読み込み中...")
-        chlamyct_model = load_ct_model(args.model, device)
+        model_path = Path(args.model)
+        if model_path.is_dir() and (model_path / "config.json").exists():
+            # HuggingFace format directory
+            from transformers import BigBirdForMaskedLM as _BigBird
+            chlamyct_model = _BigBird.from_pretrained(str(model_path), local_files_only=True)
+            chlamyct_model.eval()
+            chlamyct_model.to(device)
+            print(f"  ✓ ChlamyCT (HF dir): {sum(p.numel() for p in chlamyct_model.parameters()):,} params")
+        else:
+            chlamyct_model = load_ct_model(args.model, device)
     else:
-        print("  --model 未指定: ChlamyCTはスキップ")
+        # Auto-detect default path
+        default_path = PROJECT_ROOT / "models" / "ChlamyCodonTransformer"
+        if (default_path / "config.json").exists():
+            from transformers import BigBirdForMaskedLM as _BigBird
+            print(f"  ChlamyCT自動検出: {default_path}")
+            chlamyct_model = _BigBird.from_pretrained(str(default_path), local_files_only=True)
+            chlamyct_model.eval()
+            chlamyct_model.to(device)
+            print(f"  ✓ ChlamyCT: {sum(p.numel() for p in chlamyct_model.parameters()):,} params")
+        else:
+            print("  --model 未指定 & デフォルトパスなし: ChlamyCTはスキップ")
 
     # --- 評価ループ ---
     print(f"\n[4] {len(cr_df)} 遺伝子を評価中...")

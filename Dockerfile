@@ -20,6 +20,8 @@ COPY src/api/ /app/src/api/
 COPY src/model/ /app/src/model/
 COPY src/evaluation/ /app/src/evaluation/
 COPY data/processed/green_algae_chloroplast_cds.csv /app/data/processed/
+COPY models/BaseCodonTransformer/ /app/models/BaseCodonTransformer/
+COPY models/ChlamyCodonTransformer/ /app/models/ChlamyCodonTransformer/
 
 ENV PORT=8080
 EXPOSE 8080

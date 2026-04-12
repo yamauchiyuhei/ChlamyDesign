@@ -8,7 +8,11 @@ __pycache__
 notebooks/
 results/
 data/raw/
-models/
+models/*/checkpoint-*
+models/*/optimizer.pt
+models/*/rng_state.pth
+models/*/scheduler.pt
+models/*/training_args.bin
 docs/
 *.md
 *.ipynb

@@ -15,6 +15,10 @@ DATA_CSV = Path(os.getenv(
 
 # Model
 BASE_MODEL_ID = "adibvafa/CodonTransformer"
+BASE_MODEL_LOCAL = os.getenv(
+    "BASE_MODEL_PATH",
+    str(PROJECT_ROOT / "models" / "BaseCodonTransformer"),
+)
 CHLAMYCT_MODEL_PATH = os.getenv(
     "CHLAMYCT_MODEL_PATH",
     str(PROJECT_ROOT / "models" / "ChlamyCodonTransformer"),
