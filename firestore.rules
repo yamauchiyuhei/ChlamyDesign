@@ -4,8 +4,8 @@ service cloud.firestore {
 
     // history コレクション: 自分のデータのみ読み書き可能
     match /history/{docId} {
-      allow read, delete: if request.auth != null
-                          && request.auth.uid == resource.data.uid;
+      allow read, delete, update: if request.auth != null
+                                  && request.auth.uid == resource.data.uid;
       allow create: if request.auth != null
                     && request.resource.data.uid == request.auth.uid;
     }
