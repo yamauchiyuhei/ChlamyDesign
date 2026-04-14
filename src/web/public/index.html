@@ -8,7 +8,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
   import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
-  import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, deleteDoc, doc, Timestamp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, deleteDoc, updateDoc, doc, Timestamp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCFdAy64M61sjCbiSEa7Cg8Pwb-qReosm0",
@@ -37,6 +37,7 @@
   window.fbOrderBy = orderBy;
   window.fbGetDocs = getDocs;
   window.fbDeleteDoc = deleteDoc;
+  window.fbUpdateDoc = updateDoc;
   window.fbDoc = doc;
   window.fbTimestamp = Timestamp;
 
@@ -868,6 +869,20 @@ footer a:hover { text-decoration: underline; }
 .history-card-actions button:hover { border-color: var(--green); color: var(--green); }
 .history-card-actions button.del-btn { color: var(--muted); }
 .history-card-actions button.del-btn:hover { border-color: var(--red); color: var(--red); background: var(--red-lt); }
+.history-rename-btn {
+  background: none; border: none; cursor: pointer; padding: 0 2px;
+  font-size: .75rem; color: var(--muted); opacity: 0;
+  transition: opacity var(--transition), color var(--transition);
+  flex-shrink: 0; line-height: 1;
+}
+.history-card:hover .history-rename-btn { opacity: 1; }
+.history-rename-btn:hover { color: var(--green); }
+.history-rename-input {
+  flex: 1; font-size: .8rem; font-weight: 600; color: var(--text);
+  border: 1.5px solid var(--green); border-radius: 6px;
+  padding: 2px 8px; background: var(--surface); outline: none;
+  min-width: 0;
+}
 
 /* ── Responsive ── */
 @media (max-width: 640px) {
@@ -1427,6 +1442,7 @@ Generates multiple candidates using ChlamyCT (or Base CT as fallback), then re-r
     history_restore: 'Restore', history_delete: 'Delete',
     history_type_opt: 'Codon Optimization', history_type_re: 'Restriction Analysis',
     history_type_rna: 'RNA Structure', history_type_esm: 'ESMFold 3D', history_type_blast: 'BLAST Search',
+    history_rename_placeholder: 'Enter custom name...',
   },
   ja: {
     logo_sub: '汎用コドン最適化ツール',
@@ -1515,6 +1531,7 @@ ChlamyCT（またはBase CT）で複数の候補配列を生成し、3つの生�
     history_restore: '復元', history_delete: '削除',
     history_type_opt: 'コドン最適化', history_type_re: '制限酵素解析',
     history_type_rna: 'RNA構造', history_type_esm: 'ESMFold 3D', history_type_blast: 'BLAST検索',
+    history_rename_placeholder: '名前を入力...',
   }
 };
 
@@ -2800,6 +2817,7 @@ async function saveHistory(type, data) {
       uid: currentUser.uid,
       createdAt: window.fbTimestamp.now(),
       type: type,
+      customName: null,
       ...data
     };
     // Truncate long strings
@@ -2891,10 +2909,15 @@ function renderHistoryCard(item, time) {
     meta = `${item.hitsCount || 0} hits${item.topHitName ? ' | ' + item.topHitName.slice(0, 30) : ''}`;
   }
 
+  const displayTitle = item.customName || title;
+  const safeTitle = displayTitle.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+  const safePlaceholder = title.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+
   return `<div class="history-card">
     <div class="history-card-header">
       <div class="history-type-icon ${tc.cls}">${tc.icon}</div>
-      <div class="history-card-title">${title}</div>
+      <div class="history-card-title" id="htitle-${item.id}">${displayTitle}</div>
+      <button class="history-rename-btn" onclick="startRenameHistory('${item.id}', '${safeTitle}', '${safePlaceholder}')" title="${t('history_rename_placeholder')}">&#9998;</button>
       <span style="font-size:.65rem;color:var(--muted)">${time}</span>
     </div>
     <div class="history-card-meta">${meta}</div>
@@ -2943,6 +2966,45 @@ function restoreHistory(id) {
   }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// ── Rename history item (inline editing) ──
+function startRenameHistory(id, currentName, placeholder) {
+  const titleEl = document.getElementById('htitle-' + id);
+  if (!titleEl) return;
+  const decoded = currentName.replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+  const decodedPh = placeholder.replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'history-rename-input';
+  input.value = decoded;
+  input.placeholder = decodedPh;
+  input.maxLength = 50;
+  titleEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const save = () => {
+    const newName = input.value.trim().slice(0, 50);
+    renameHistory(id, newName || null);
+  };
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.removeEventListener('blur', save); renderHistory(); }
+  });
+}
+window.startRenameHistory = startRenameHistory;
+
+async function renameHistory(id, newName) {
+  if (!window.fbDb) return;
+  try {
+    await window.fbUpdateDoc(window.fbDoc(window.fbDb, 'history', id), { customName: newName });
+    const item = historyItems.find(h => h.id === id);
+    if (item) item.customName = newName;
+    renderHistory();
+  } catch (e) { console.error('Rename history error:', e); renderHistory(); }
+}
+window.renameHistory = renameHistory;
 
 // ── Delete history item ──
 async function deleteHistory(id) {
