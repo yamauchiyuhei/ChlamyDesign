@@ -2983,14 +2983,17 @@ function startRenameHistory(id, currentName, placeholder) {
   input.focus();
   input.select();
 
+  let saved = false;
   const save = () => {
+    if (saved) return;
+    saved = true;
     const newName = input.value.trim().slice(0, 50);
     renameHistory(id, newName || null);
   };
   input.addEventListener('blur', save);
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
-    if (e.key === 'Escape') { input.removeEventListener('blur', save); renderHistory(); }
+    if (e.key === 'Enter') { e.preventDefault(); input.removeEventListener('blur', save); save(); }
+    if (e.key === 'Escape') { saved = true; input.removeEventListener('blur', save); renderHistory(); }
   });
 }
 window.startRenameHistory = startRenameHistory;
