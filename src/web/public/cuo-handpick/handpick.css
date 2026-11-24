@@ -1,0 +1,30 @@
+.handpick-panel {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: .8rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.handpick-panel[hidden] { display: none; }
+.handpick-panel p { margin: 0 0 10px; }
+.handpick-panel details { margin: 10px 0; }
+.handpick-panel summary { cursor: pointer; font-weight: 600; color: var(--text); }
+.handpick-panel a { color: var(--green); font-size: .74rem; }
+.handpick-panel .handpick-hint { font-size: .74rem; color: var(--muted); }
+
+.handpick-field,
+.handpick-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.handpick-field { justify-content: space-between; }
+.handpick-field input { width: 85px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; }
+.handpick-checkbox input { accent-color: var(--green); }
+.handpick-field input:disabled { opacity: .5; }

@@ -1,0 +1,43 @@
+/* The shared CodonDesign shell keeps all four tools in one navigation. */
+.workspace-view #application-main { max-width: none; padding: 0; }
+body > .tab-bar { height: 64px; padding: 8px max(24px, calc((100vw - 1000px)/2)) 0; border-bottom: 1px solid var(--border); }
+#application-main { padding-top: 24px; }
+#application-main > .tab-content { border-radius: 14px; }
+.workspace-view #application-main { padding-top: 0; }
+.workspace-view #application-main > .tab-content { border-radius: 0; }
+.workspace-view .tab-content { padding: 0; border: 0; border-radius: 0; box-shadow: none; min-height: calc(100vh - 120px); }
+.workspace-view > footer { display: none; }
+.workspace-view #panel-workspace { animation: none; }
+#workspace-root { display: block; min-height: calc(100vh - 120px); }
+.workspace-loading { padding: 80px 24px; text-align: center; color: var(--muted); }
+.workspace-add { color: var(--green-dk); border-color: var(--green-md); background: var(--green-lt); }
+.dl-row { flex-wrap: wrap; }
+.analysis-origin { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 20px; border: 1px solid var(--green-md); border-radius: 8px; background: var(--green-lt); font-size: .8rem; }
+.analysis-origin[hidden] { display: none; }
+.analysis-origin span { flex: 1; overflow-wrap: anywhere; }
+.analysis-origin button { flex-shrink: 0; border: none; background: transparent; font: inherit; color: var(--green-dk); cursor: pointer; font-weight: 600; }
+.history-card-actions { flex-wrap: wrap; }
+.integration-notice { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 500; max-width: min(620px,90vw); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-lg); background: white; padding: 14px 20px; font-size: .85rem; }
+@media (max-width: 1050px) { .workspace-view .tab-bar { padding: 8px 12px 0; } }
+
+.run-settings { display:flex; gap:16px; margin-top:16px; flex-wrap:wrap; }
+.run-settings label { display:flex; align-items:center; gap:8px; color:var(--text-secondary); font-size:.8rem; }
+.run-settings select,.run-settings input { border:1px solid var(--border); border-radius:6px; padding:7px 10px; background:white; font:inherit; }
+.run-settings input { width:130px; }
+.analysis-origin { position:sticky; top:8px; z-index:5; }
+.analysis-origin button[hidden] { display:none; }
+
+.protein-bridge { padding:22px; border:1px solid var(--green-md); border-radius:12px; background:linear-gradient(125deg,var(--green-lt),#fff 75%); }
+.protein-bridge-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; }
+.protein-bridge-eyebrow { color:var(--green-dk); font-size:.68rem; font-weight:700; letter-spacing:.1em; }
+.protein-bridge h3 { margin:6px 0; font-size:1rem; }
+.protein-bridge-heading p { margin:0; color:var(--muted); font-size:.78rem; line-height:1.6; }
+.protein-bridge-heading button { flex-shrink:0; white-space:nowrap; }
+.protein-bridge-controls { display:grid; grid-template-columns:minmax(180px,2fr) 100px 100px minmax(125px,1fr); gap:12px; margin-top:20px; }
+.protein-bridge-controls label { display:flex; flex-direction:column; gap:7px; color:var(--muted); font-size:.75rem; font-weight:600; }
+.protein-bridge-controls input,.protein-bridge-controls select { width:100%; min-width:0; padding:9px 10px; background:white; border:1px solid var(--border); border-radius:7px; font:inherit; color:var(--text); }
+.protein-bridge-note { margin:12px 0 0; color:var(--muted); font-size:.7rem; line-height:1.7; }
+.protein-bridge-status { margin:12px 0 0; color:var(--green-dk); font-size:.78rem; line-height:1.6; }
+.protein-bridge-status.invalid { color:var(--red,#b42318); }
+#pb-preview { white-space:pre-wrap; overflow-wrap:anywhere; margin:10px 0 0; padding:10px 12px; border-radius:6px; border:1px solid var(--border); background:#fff; font: .76rem/1.65 'JetBrains Mono',monospace; }
+@media (max-width:700px) { .protein-bridge-heading { align-items:flex-start; flex-direction:column; } .protein-bridge-controls { grid-template-columns:1fr 1fr; } .protein-bridge-controls label:first-child { grid-column:1/-1; } .analysis-origin { flex-wrap:wrap; } }

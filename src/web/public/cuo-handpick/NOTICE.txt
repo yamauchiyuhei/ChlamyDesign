@@ -1,0 +1,13 @@
+CUO C.reinhardtii Handpick reference tables
+Source: https://github.com/khai-/CUO
+Upstream commit: cfbe4cc2c433f195d2b80f6c32ff1d66319cb79e
+The .wt, .cft and .cpt files are distributed byte-for-byte from CUO.
+Upstream license: GNU General Public License version 3 (see COPYING).
+reference.js contains their numeric values in the codon order documented in CUO Support/Common.java.
+The additional trailing value in .cft is excluded, matching CUO reading 64 entries.
+
+{
+  "wt": "9b0b2594e07e39d96537a075d897d18f8271aa33f776714ad7307cd43893bf8d",
+  "cft": "dfff464ffd16269d32c29169dacb6d9e2026c949d4cca4ce5dd9d090919d4510",
+  "cpt": "3e4f42c6373d00e072d18e2a535d6fcef544094026256c697a38f67fa1657d8c"
+}

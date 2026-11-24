@@ -5,48 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CodonDesign — Universal Codon Optimizer</title>
 <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-auth.js";
-  import { getFirestore, collection, addDoc, query, where, orderBy, getDocs, deleteDoc, updateDoc, doc, Timestamp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyCFdAy64M61sjCbiSEa7Cg8Pwb-qReosm0",
-    authDomain: "chlamydesign.firebaseapp.com",
-    projectId: "chlamydesign",
-    storageBucket: "chlamydesign.firebasestorage.app",
-    messagingSenderId: "979664573891",
-    appId: "1:979664573891:web:2a5e54e8a716d14680d976"
-  };
-
-  const fbApp = initializeApp(firebaseConfig);
-  const fbAuth = getAuth(fbApp);
-  const fbDb = getFirestore(fbApp);
-  const googleProvider = new GoogleAuthProvider();
-
-  // Expose to global scope for inline handlers
-  window.fbAuth = fbAuth;
-  window.fbDb = fbDb;
-  window.googleProvider = googleProvider;
-  window.fbSignInWithPopup = signInWithPopup;
-  window.fbSignOut = signOut;
-  window.fbCollection = collection;
-  window.fbAddDoc = addDoc;
-  window.fbQuery = query;
-  window.fbWhere = where;
-  window.fbOrderBy = orderBy;
-  window.fbGetDocs = getDocs;
-  window.fbDeleteDoc = deleteDoc;
-  window.fbUpdateDoc = updateDoc;
-  window.fbDoc = doc;
-  window.fbTimestamp = Timestamp;
-
-  onAuthStateChanged(fbAuth, (user) => {
-    window.currentUser = user;
-    window.updateAuthUI && window.updateAuthUI();
-    if (user) window.loadHistory && window.loadHistory();
-  });
-</script>
+<script type="module" src="/workspace-assets/workspace.js"></script>
+<script defer src="/protein-translation.js"></script>
+<script defer src="/protein-bridge.js"></script>
+<script defer src="/cuo-handpick/reference.js"></script>
+<script defer src="/cuo-handpick/optimizer.js"></script>
+<script defer src="/cuo-handpick/ui.js"></script>
+<script defer src="/integration.js"></script>
+<link rel="stylesheet" href="/cuo-handpick/handpick.css">
+<link rel="stylesheet" href="/integration.css">
 <style>
 /* ══════════════════════════════════════════════════════════════════
    Reset & Design Tokens
@@ -346,6 +313,7 @@ textarea.error {
 .strategy-tag.stoch-tag { background: var(--amber-lt); color: var(--amber); }
 .strategy-tag.api-tag { background: var(--blue-lt); color: var(--blue); }
 .strategy-tag.bio-tag { background: var(--purple-lt); color: var(--purple); }
+.strategy-tag.local-tag { background: #e2e8f0; color: #334155; }
 .chlamydesign-info {
   display: none; font-size: .76rem; color: var(--text-secondary); line-height: 1.5;
   padding: 10px 14px; background: var(--purple-lt); border-radius: var(--radius-sm);
@@ -385,6 +353,11 @@ textarea.error {
 .slider-row:last-child { margin-bottom: 0; }
 .slider-label { font-size: .78rem; font-weight: 600; min-width: 90px; color: var(--text-secondary); }
 .slider-row input[type="range"] { flex: 1; accent-color: var(--green); height: 4px; }
+.slider-hint {
+  display: none; margin-top: 10px; font-size: .72rem; line-height: 1.55;
+  color: var(--text-secondary);
+}
+.slider-hint.visible { display: block; }
 .slider-val {
   font-size: .78rem; font-weight: 700; min-width: 36px;
   text-align: center; font-variant-numeric: tabular-nums;
@@ -439,6 +412,37 @@ textarea.error {
   padding: 8px 12px; background: var(--red-lt); border-radius: 6px;
 }
 .err-msg.visible { display: flex; }
+
+/* ── Warning box (model caveats returned by the API) ── */
+.warn-box {
+  display: none; margin-bottom: 16px;
+  padding: 11px 14px; border-radius: var(--radius-sm);
+  background: var(--amber-lt); border-left: 3px solid var(--amber);
+  color: #92400e; font-size: .78rem; line-height: 1.6;
+}
+.warn-box.visible { display: block; animation: fadeIn .2s ease; }
+.warn-box-title {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+  font-weight: 800; font-size: .72rem; letter-spacing: .3px;
+  text-transform: uppercase; color: var(--amber);
+}
+.warn-box-title svg { flex-shrink: 0; }
+.warn-box ul { margin: 0; padding-left: 18px; }
+.warn-box li { margin: 3px 0; }
+
+/* ── Run meta (seed etc.) ── */
+.run-meta {
+  display: none; margin-bottom: 12px; font-size: .72rem; color: var(--muted);
+  font-family: 'SF Mono', Menlo, Consolas, monospace; letter-spacing: .2px;
+}
+.run-meta.visible { display: block; }
+
+/* ── GC3 sub-value next to GC% ── */
+.metric-gc3 {
+  display: none; font-size: .7rem; font-weight: 700; letter-spacing: -.1px;
+  color: var(--text-secondary); white-space: nowrap;
+}
+.metric-gc3.visible { display: inline-block; }
 
 /* ── Results ── */
 #results { display: none; }
@@ -915,6 +919,10 @@ footer a:hover { text-decoration: underline; }
       <span class="api-dot" id="api-dot"></span>
       <span id="api-label" data-i18n="api_checking">Checking API...</span>
     </span>
+    <button class="history-btn" id="runs-btn" onclick="showCommonRuns()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+      <span data-integration="runs">Runs</span>
+    </button>
     <button class="history-btn" id="history-btn" onclick="toggleHistoryPanel()" style="display:none">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       <span data-i18n="btn_history">History</span>
@@ -943,12 +951,15 @@ footer a:hover { text-decoration: underline; }
   </div>
 </header>
 
-<main>
   <!-- Tab bar -->
   <div class="tab-bar">
     <button class="tab-btn active" onclick="switchTab('codon')" id="tab-btn-codon">
       <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       <span data-i18n="tab_codon">Codon Optimization</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('workspace')" id="tab-btn-workspace">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M10 7h6v7M7 10v7h7"/></svg>
+      <span data-integration="workspace">Workspace</span>
     </button>
     <button class="tab-btn" onclick="switchTab('seqanalysis')" id="tab-btn-seqanalysis">
       <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -960,6 +971,8 @@ footer a:hover { text-decoration: underline; }
     </button>
   </div>
 
+
+<main id="application-main">
   <div class="tab-content">
 
     <!-- ═══ TAB 1: Codon Optimization ═══ -->
@@ -1032,6 +1045,10 @@ footer a:hover { text-decoration: underline; }
             <input type="radio" name="strategy" value="bfc">
             <span class="dot"></span> BFC <span class="strategy-tag stoch-tag">stochastic</span>
           </label>
+          <label class="strategy-pill" id="pill-handpick">
+            <input type="radio" name="strategy" value="cuo_handpick">
+            <span class="dot"></span> CUO Handpick
+          </label>
           <label class="strategy-pill" id="pill-basect">
             <input type="radio" name="strategy" value="base_ct">
             <span class="dot"></span> Base CT <span class="strategy-tag api-tag">API</span>
@@ -1044,7 +1061,44 @@ footer a:hover { text-decoration: underline; }
             <input type="radio" name="strategy" value="chlamydesign">
             <span class="dot"></span> ChlamyDesign <span class="strategy-tag bio-tag">BIO</span>
           </label>
+          <label class="strategy-pill hidden" id="pill-arv0">
+            <input type="radio" name="strategy" value="ar_v0">
+            <span class="dot"></span> AR-v0 <span class="strategy-tag local-tag">CPU</span>
+          </label>
+          <label class="strategy-pill hidden" id="pill-arv1">
+            <input type="radio" name="strategy" value="ar_v1">
+            <span class="dot"></span> AR-v1 <span class="strategy-tag local-tag">CPU</span>
+          </label>
+          <label class="strategy-pill hidden" id="pill-arv2">
+            <input type="radio" name="strategy" value="ar_v2">
+            <span class="dot"></span> AR-v2 <span class="strategy-tag local-tag">CPU</span>
+          </label>
+          <label class="strategy-pill hidden" id="pill-mlmv2">
+            <input type="radio" name="strategy" value="mlm_v2">
+            <span class="dot"></span> MLM-v2 <span class="strategy-tag local-tag">CPU</span>
+          </label>
         </div>
+
+        <section class="handpick-panel" id="handpick-panel" aria-label="CUO Handpick" hidden>
+          <p data-i18n="handpick_description">Uses CUO’s original C.reinhardtii Handpick tables. The default matches “All the best” with both optional filters off.</p>
+          <details>
+            <summary data-i18n="handpick_options">CUO options</summary>
+            <label class="handpick-field" id="handpick-weight-row">
+              <span data-i18n="handpick_min_weight">Minimum codon weight</span>
+              <input id="handpick-min-weight" type="number" min="0" max="1" step="0.05" value="0.5">
+            </label>
+            <p class="handpick-hint" data-i18n="handpick_sampling">Sampling corresponds to CUO’s “Avoid codon repeats”. Seed makes sampling reproducible.</p>
+            <label class="handpick-checkbox">
+              <input id="handpick-avoid-pairs" type="checkbox">
+              <span data-i18n="handpick_avoid_pairs">Avoid bad codon pairs</span>
+            </label>
+            <label class="handpick-field">
+              <span data-i18n="handpick_min_pair">Minimum pair score</span>
+              <input id="handpick-min-pair" type="number" min="0" max="1" step="0.05" value="0.5" disabled>
+            </label>
+          </details>
+          <a href="https://github.com/khai-/CUO/tree/cfbe4cc2c433f195d2b80f6c32ff1d66319cb79e/Construction" target="_blank" rel="noopener" data-i18n="handpick_source">CUO reference tables</a>
+        </section>
 
         <button class="strategy-toggle" id="strategy-toggle" onclick="toggleStrategyDesc()">
           <span data-i18n="strategy_detail_toggle">What's the difference?</span>
@@ -1055,19 +1109,24 @@ footer a:hover { text-decoration: underline; }
         </div>
 
         <div class="slider-panel" id="slider-panel" style="display:none">
-          <div class="slider-row">
+          <div class="slider-row" id="slider-row-seqs">
             <span class="slider-label" data-i18n="slider_candidates">Candidates</span>
             <input type="range" id="slider-seqs" min="1" max="20" value="10" step="1">
             <span class="slider-val" id="val-seqs">10</span>
           </div>
-          <div class="slider-row">
+          <div class="slider-row" id="slider-row-temp">
             <span class="slider-label" data-i18n="slider_temperature">Temperature</span>
-            <input type="range" id="slider-temp" min="0.1" max="1.0" value="0.2" step="0.1">
+            <input type="range" id="slider-temp" min="0.0" max="2.0" value="0.2" step="0.1">
             <span class="slider-val" id="val-temp">0.2</span>
           </div>
+          <div class="slider-hint" id="slider-hint"></div>
         </div>
       </div>
 
+      <div class="run-settings">
+        <label><span data-i18n="generation_mode">Generation mode</span><select id="generation-mode"><option value="sample" data-i18n="generation_sample">Sampling</option><option value="greedy" data-i18n="generation_greedy">Most likely</option></select></label>
+        <label><span>Seed</span><input id="optimization-seed" type="number" min="0" max="2147483640" step="1" value="0"></label>
+      </div>
       <!-- Run button -->
       <div style="margin-top:24px">
         <button class="btn-primary" id="run-btn" onclick="runOptimization()">
@@ -1079,6 +1138,14 @@ footer a:hover { text-decoration: underline; }
 
       <!-- Results -->
       <div id="results">
+        <div class="warn-box" id="warn-box">
+          <div class="warn-box-title">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M7.13 1.7a1 1 0 0 1 1.74 0l6.1 10.8A1 1 0 0 1 14.1 14H1.9a1 1 0 0 1-.87-1.5l6.1-10.8zM8 5.25a.75.75 0 0 0-.75.75v3a.75.75 0 0 0 1.5 0V6A.75.75 0 0 0 8 5.25zm0 5.25a.9.9 0 1 0 0 1.8.9.9 0 0 0 0-1.8z"/></svg>
+            <span data-i18n="warn_title">Model caveats</span>
+          </div>
+          <ul id="warn-list"></ul>
+        </div>
+        <div class="run-meta" id="run-meta"></div>
         <div class="chlamydesign-info" id="chlamydesign-info"></div>
         <div class="result-section">
           <div class="result-section-title" data-i18n="card_metrics">
@@ -1088,7 +1155,10 @@ footer a:hover { text-decoration: underline; }
           <div class="metrics-grid">
             <div class="metric-box">
               <div class="metric-label" data-i18n="metric_gc">GC Content</div>
-              <div class="metric-value" id="m-gc">--</div>
+              <div style="display:flex;align-items:baseline;gap:5px;flex-wrap:wrap">
+                <div class="metric-value" id="m-gc">--</div>
+                <span class="metric-gc3" id="m-gc3"></span>
+              </div>
               <div class="metric-bar"><div class="metric-bar-fill" id="m-gc-bar" style="width:0%"></div></div>
               <div class="gc-target-note"><span class="gc-dot"></span> <span data-i18n="metric_gc_target" id="gc-target-label">Target: organism-specific</span></div>
             </div>
@@ -1154,6 +1224,7 @@ footer a:hover { text-decoration: underline; }
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               CSV
             </button>
+            <button class="btn-secondary workspace-add" onclick="sendResultToWorkspace()"><span aria-hidden="true">＋</span><span data-integration="add">Add to workspace</span></button>
             <button class="btn-text" onclick="sendToAnalysis()" data-i18n="btn_send_analysis">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
               Analyze this sequence
@@ -1162,6 +1233,8 @@ footer a:hover { text-decoration: underline; }
         </div>
       </div>
     </div>
+
+    <div class="tab-panel" id="panel-workspace"><div id="workspace-root"><div class="workspace-loading" role="status">ワークスペースを読み込んでいます…</div></div></div>
 
     <!-- ═══ TAB 2: Sequence Analysis ═══ -->
     <div class="tab-panel" id="panel-seqanalysis">
@@ -1185,6 +1258,26 @@ footer a:hover { text-decoration: underline; }
         </div>
       </div>
 
+      <div class="form-divider"></div>
+
+      <section class="protein-bridge" aria-labelledby="pb-title">
+        <div class="protein-bridge-heading">
+          <div><span class="protein-bridge-eyebrow">DNA → PROTEIN</span>
+            <h3 id="pb-title" data-protein-bridge="title">Connect to protein analysis</h3>
+            <p data-protein-bridge="hint">Select a CDS or specify the DNA region to translate.</p>
+          </div>
+          <button type="button" class="btn-primary" id="sa-to-protein" onclick="sendSequenceToProtein()" disabled data-protein-bridge="go">Open protein analysis →</button>
+        </div>
+        <div class="protein-bridge-controls">
+          <label><span data-protein-bridge="region">Region</span><select id="pb-region" class="form-select" onchange="selectProteinRegion()"></select></label>
+          <label><span data-protein-bridge="start">Start (nt)</span><input id="pb-start" type="number" min="1" step="1" value="1" oninput="editProteinRegion()"></label>
+          <label><span data-protein-bridge="end">End (nt)</span><input id="pb-end" type="number" min="1" step="1" value="1" oninput="editProteinRegion()"></label>
+          <label><span data-protein-bridge="strand">Direction</span><select id="pb-strand" class="form-select" onchange="editProteinRegion()"><option value="1" data-protein-bridge="forward">Forward</option><option value="-1" data-protein-bridge="reverse">Reverse complement</option></select></label>
+        </div>
+        <p class="protein-bridge-note" data-protein-bridge="code">Standard genetic code. Translation starts at the selected position; only a terminal stop is removed.</p>
+        <p id="pb-status" class="protein-bridge-status" role="status" aria-live="polite"></p>
+        <pre id="pb-preview" aria-label="Translated protein preview" hidden></pre>
+      </section>
       <div class="form-divider"></div>
 
       <!-- Restriction enzymes -->
@@ -1366,11 +1459,20 @@ const I18N = {
     label_input: 'Amino acid sequence (single-letter code)',
     hint_input: 'Standard amino acids (A-Z). Stop symbol * or _ optional.',
     hint_input_dna: 'DNA sequence (A/T/G/C). Must be multiples of 3.',
+    generation_mode: 'Generation mode', generation_sample: 'Sampling', generation_greedy: 'Most likely',
     translated_protein: 'Translated protein:',
+    err_looks_like_dna: 'This looks like a DNA sequence (A/C/G/T only), but PROTEIN mode is selected. A, C, G and T are also valid amino acid letters (Ala/Cys/Gly/Thr), so it would be read as a protein of that many residues. Switch to DNA above, or paste an amino-acid sequence.',
     err_dna_invalid: 'Invalid DNA. Only A, T, G, C allowed.',
     err_dna_not_triplet: 'DNA length must be a multiple of 3.',
     err_dna_short: 'DNA must be at least 9 nt (3 codons).',
     err_dna_long_opt: 'DNA too long (max 9000 nt).',
+    handpick_description: 'Uses CUO’s original C.reinhardtii Handpick tables. The default matches “All the best” with both optional filters off.',
+    handpick_options: 'CUO options', handpick_min_weight: 'Minimum codon weight',
+    handpick_sampling: 'Sampling corresponds to CUO’s “Avoid codon repeats”. Seed makes sampling reproducible.',
+    handpick_avoid_pairs: 'Avoid bad codon pairs', handpick_min_pair: 'Minimum pair score',
+    handpick_source: 'CUO reference tables', handpick_result: 'CUO Handpick reference',
+    handpick_most_frequent: 'Most frequent codons', handpick_cai: 'Handpick CAI',
+    handpick_scope: 'CUO Handpick is available for C. reinhardtii chloroplast only.',
     card_strategy: 'Strategy', strategy_detail_toggle: "What's the difference?",
     strategy_desc: '\
 <div style="display:flex;flex-direction:column;gap:14px;font-size:13.5px;line-height:1.65">\
@@ -1387,8 +1489,14 @@ Generates multiple candidates using ChlamyCT (or Base CT as fallback), then re-r
 &nbsp;&nbsp;① <strong>5′ mRNA structure minimization</strong> — Minimizes RNA secondary structure (MFE) in the first 47 nt of CDS (Kudla et al. 2009). Strong 5′ structure inhibits ribosome binding and translation initiation.<br>\
 &nbsp;&nbsp;② <strong>Codon pair score (CPS) maximization</strong> — Maximizes adjacent codon-pair compatibility based on the chloroplast tRNA pool (Coleman et al. 2008). Codon pairs that match available tRNA abundance improve translational elongation efficiency.<br>\
 &nbsp;&nbsp;③ <strong>5′ codon context preservation</strong> — Preserves the codon usage bias found in the first 10 codons of highly expressed chloroplast genes (rbcL, psbA, psaA, atpA, etc.). These positions are critical for translational activator binding in chloroplast mRNA.</div>\
+<div><strong style="color:#334155">⬤ AR-v0 / AR-v1 / AR-v2</strong> <span style="background:#e2e8f0;color:#334155;padding:1px 6px;border-radius:4px;font-size:11px">CPU</span> — <em>ChloroplastLM autoregressive codon LM.</em><br>\
+Trained from scratch on 342,000 RefSeq plastid CDS. Codons are generated left to right, each one conditioned on every codon before it. <strong>v0</strong> = unconditional; <strong>v1</strong> = adds amino-acid and phylogenetic conditioning; <strong>v2</strong> = adds ESM protein embeddings and species conditioning. Temperature acts as a GC3 dial: measured GC3 moves from 6.4% at T=0 to 27.3% at T=2.0, so it can be tuned toward the AT-rich plastid target instead of being fixed by the model.</div>\
+<div><strong style="color:#334155">⬤ MLM-v2</strong> <span style="background:#e2e8f0;color:#334155;padding:1px 6px;border-radius:4px;font-size:11px">CPU</span> — <em>Masked-language-model control.</em><br>\
+The same 342,000-CDS plastid data trained with a fill-in-the-blank (masked) objective instead of left-to-right prediction — the control arm for AR-v2. Temperature 0 selects the highest-probability codon; higher temperatures sample from the predicted distribution. The effect on GC3 depends on the sequence.</div>\
 </div>',
     slider_candidates: 'Candidates', slider_temperature: 'Temperature',
+    warn_title: 'Model caveats',
+    slider_hint_lm: 'Temperature 0 selects the most likely codons; higher values increase sampling diversity. The effect on GC3 depends on the model and sequence.',
     btn_optimize: 'Optimize', btn_generating: 'Generating...', btn_optimizing: 'Optimizing...',
     shortcut_hint: 'Cmd+Enter',
     card_metrics: 'Metrics', metric_gc: 'GC Content', metric_gc_target: 'Target: organism-specific',
@@ -1455,11 +1563,20 @@ Generates multiple candidates using ChlamyCT (or Base CT as fallback), then re-r
     label_input: 'アミノ酸配列（1文字コード）',
     hint_input: '標準アミノ酸のみ（A-Z）。終止記号 * / _ は任意。',
     hint_input_dna: 'DNA配列（A/T/G/C）。3の倍数であること。',
+    generation_mode: '生成方式', generation_sample: 'サンプリング', generation_greedy: '最尤選択',
     translated_protein: '翻訳タンパク質:',
+    err_looks_like_dna: 'DNA配列に見えます（A/C/G/T のみ）が、PROTEIN モードが選ばれています。A・C・G・T はアミノ酸1文字表記としても有効（Ala/Cys/Gly/Thr）なので、そのままだと「その文字数のタンパク質」として読まれます。上の DNA に切り替えるか、アミノ酸配列を貼ってください。',
     err_dna_invalid: '無効なDNAです。A, T, G, Cのみ使用可能。',
     err_dna_not_triplet: 'DNA長は3の倍数である必要があります。',
     err_dna_short: 'DNAは最低9 nt（3コドン）必要です。',
     err_dna_long_opt: 'DNAが長すぎます（最大9000 nt）。',
+    handpick_description: 'CUO公式の「C.reinhardtii Handpick」参照表を使います。初期設定は「All the best」で、2つの追加フィルターはオフです。',
+    handpick_options: 'CUOのオプション', handpick_min_weight: 'コドンの最小重み',
+    handpick_sampling: 'サンプリングはCUOの「Avoid codon repeats」に対応します。同じSeedで再実行できます。',
+    handpick_avoid_pairs: '低スコアのコドンペアを避ける', handpick_min_pair: 'コドンペアの最小スコア',
+    handpick_source: 'CUO公式の参照表', handpick_result: 'CUO Handpick参照表',
+    handpick_most_frequent: '最頻出コドン', handpick_cai: 'Handpick基準のCAI',
+    handpick_scope: 'CUO Handpickはクラミドモナス葉緑体用です。対象生物種を変更してください。',
     card_strategy: '最適化戦略', strategy_detail_toggle: '戦略の違いは？',
     strategy_desc: '\
 <div style="display:flex;flex-direction:column;gap:14px;font-size:13.5px;line-height:1.65">\
@@ -1476,8 +1593,14 @@ ChlamyCT（またはBase CT）で複数の候補配列を生成し、3つの生�
 &nbsp;&nbsp;① <strong>5′ mRNA二次構造の最小化</strong> — CDS先頭47 ntのRNA二次構造（MFE）を最小化（Kudla et al. 2009）。5′末端の強い二次構造はリボソーム結合と翻訳開始を阻害します。<br>\
 &nbsp;&nbsp;② <strong>コドンペアスコア（CPS）の最大化</strong> — 葉緑体tRNAプールに基づく隣接コドンペアの適合性を最大化（Coleman et al. 2008）。利用可能なtRNA量に適合するコドンペアは翻訳伸長効率を向上させます。<br>\
 &nbsp;&nbsp;③ <strong>5′コドン文脈の保存</strong> — 高発現葉緑体遺伝子（rbcL, psbA, psaA, atpA等）の先頭10コドンに見られるコドン使用バイアスを保存。これらの位置は葉緑体mRNAの翻訳活性化因子の結合に重要です。</div>\
+<div><strong style="color:#334155">⬤ AR-v0 / AR-v1 / AR-v2</strong> <span style="background:#e2e8f0;color:#334155;padding:1px 6px;border-radius:4px;font-size:11px">CPU</span> — <em>ChloroplastLM の自己回帰コドン言語モデル。</em><br>\
+RefSeq plastid の CDS 34.2万本でゼロから学習。コドンを左から右へ、直前までの全コドンを条件として逐次生成します。<strong>v0</strong> = 条件なし、<strong>v1</strong> = ＋アミノ酸・系統条件、<strong>v2</strong> = ＋ESMタンパク質埋め込み・種条件。温度が事実上のGC3ダイヤルとして働き、実測でT=0のときGC3 6.4%、T=2.0のとき27.3%まで動くため、AT-richな色素体ゲノムの目標値に向けて調整できます。</div>\
+<div><strong style="color:#334155">⬤ MLM-v2</strong> <span style="background:#e2e8f0;color:#334155;padding:1px 6px;border-radius:4px;font-size:11px">CPU</span> — <em>穴埋め方式の対照モデル。</em><br>\
+同じ色素体CDS 34.2万本を、左から右への予測ではなくマスク（穴埋め）目的関数で学習した AR-v2 の対照。温度0では最も確率の高いコドンを選び、温度を上げると予測分布から確率的に選びます。GC3への影響は配列によって異なります。</div>\
 </div>',
     slider_candidates: '候補数', slider_temperature: '温度',
+    warn_title: 'モデルに関する注意',
+    slider_hint_lm: '温度0では最も確率の高いコドンを選び、温度を上げると候補の多様性が増します。GC3への影響はモデルと配列によって異なります。',
     btn_optimize: '最適化', btn_generating: 'AI生成中...', btn_optimizing: '最適化中...',
     shortcut_hint: 'Cmd+Enter',
     card_metrics: '評価指標', metric_gc: 'GC含量', metric_gc_target: '目標: 生物種依存',
@@ -1562,6 +1685,7 @@ function setLang(lang) {
   document.getElementById('main-title').innerHTML = t('main_title');
   document.getElementById('main-subtitle').innerHTML = t('main_subtitle');
   document.getElementById('strategy-desc').innerHTML = t('strategy_desc');
+  if (typeof updateStrategyPanel === 'function') updateStrategyPanel();
   const label = document.getElementById('api-label');
   if (apiAvailable) label.textContent = t('api_online');
   else if (label.textContent !== t('api_checking')) label.textContent = t('api_offline');
@@ -1574,15 +1698,23 @@ function setLang(lang) {
   if (inputType === 'dna') { seqLabel.textContent = t('card_dna_input'); seqHint.textContent = t('hint_input_dna'); }
   else { seqLabel.textContent = t('card_protein'); seqHint.textContent = t('hint_input'); }
   renderOrganismDropdown();
+  window.updateIntegrationLabels?.();
+  window.dispatchEvent(new CustomEvent('codon:language', {detail:{language:lang}}));
 }
 
 // ── Tab switching ──
 function switchTab(tabId) {
+  window.activateAnalysisPanel?.(tabId);
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-btn-' + tabId).classList.add('active');
   document.getElementById('panel-' + tabId).classList.add('active');
+  document.body.classList.toggle('workspace-view', tabId === 'workspace');
+  document.querySelectorAll('.tab-btn').forEach(b => b.setAttribute('aria-selected', String(b.id === 'tab-btn-' + tabId)));
+  if (tabId === 'workspace') window.ensureCodonWorkspace?.();
+  if (location.hash !== '#' + tabId) history.replaceState(null, '', '#' + tabId);
 }
+
 
 // ── Strategy description toggle ──
 function toggleStrategyDesc() {
@@ -1593,12 +1725,10 @@ function toggleStrategyDesc() {
 }
 
 // ── Send optimized DNA to analysis tab ──
-function sendToAnalysis() {
-  if (!lastDNA) return;
-  document.getElementById('sa-dna-input').value = lastDNA;
-  document.getElementById('sa-seq-len').textContent = lastDNA.length + ' nt';
-  switchTab('seqanalysis');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+function sendToAnalysis(){
+  if(!lastRun?.dna)return;
+  const result={...lastRun};
+  window.dispatchEvent(new CustomEvent('codon:analyze',{detail:{sequence:result.dna,kind:'dna',name:result.strategy+' · '+result.protein.length+' aa',scope:'candidate',sourceKind:'cds',species:result.organism,revisionId:result.outputRevisionId||crypto.randomUUID(),sourceRunId:result.runId||null}}));
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1611,7 +1741,7 @@ const POPULAR_ORGANISMS = [
   'Drosophila melanogaster','Bacillus subtilis','Caenorhabditis elegans',
   'Nicotiana tabacum','Pseudomonas putida',
 ];
-const CHLAMYDOMONAS_ORGANISMS = ['Chlamydomonas reinhardtii chloroplast','Chlamydomonas reinhardtii'];
+const CHLAMYDOMONAS_ORGANISMS = ['Chlamydomonas reinhardtii chloroplast'];
 let allOrganisms = [];
 let selectedOrganism = '';
 const CHLAMY_CODON_FREQ = {
@@ -1637,16 +1767,17 @@ const DNA_TO_AA = {
   AGT:'S',AGC:'S',AGA:'R',AGG:'R',GGT:'G',GGC:'G',GGA:'G',GGG:'G',
 };
 function translateDNA(dna) {
-  const s = dna.toUpperCase().replace(/[^ATGC]/g,'');
+  const s = dna.toUpperCase().replace(/\s+/g,'');
   let protein = '';
   for (let i = 0; i + 2 < s.length; i += 3) {
-    const codon = s.slice(i, i + 3);
-    const aa = DNA_TO_AA[codon];
-    if (!aa || aa === '*') break;
+    const aa=DNA_TO_AA[s.slice(i,i+3)];
+    if (!aa) return '';
+    if (aa === '*') {if(i !== s.length-3)return '';break;}
     protein += aa;
   }
   return protein;
 }
+
 let inputType = 'protein';
 
 /* ── Input type toggle logic ── */
@@ -1702,6 +1833,8 @@ function selectOrganism(name) {
   document.getElementById('organism-search').value = name;
   document.getElementById('organism-dropdown').classList.remove('open');
   updateOrganismUI();
+  window.applyWorkspaceSpeciesGate?.();
+  window.clearLegacyResults?.('optimize');
 }
 
 function updateOrganismUI() {
@@ -1730,7 +1863,13 @@ document.addEventListener('click',(e)=>{if(!document.getElementById('organism-se
 const STOP_CODONS=['TAA','TAG','TGA'];
 const VALID_AA=new Set('ACDEFGHIKLMNPQRSTVWY');
 const CT_STRATEGIES=['base_ct','chlamyct','chlamydesign'];
+/* ChloroplastLM autoregressive / masked LMs (strategies 6-9) */
+const LM_STRATEGIES=['ar_v0','ar_v1','ar_v2','mlm_v2'];
+const LM_PILL_IDS={ar_v0:'pill-arv0',ar_v1:'pill-arv1',ar_v2:'pill-arv2',mlm_v2:'pill-mlmv2'};
+/* Temperature is only meaningful for the autoregressive variants. */
+const AR_STRATEGIES=['ar_v0','ar_v1','ar_v2'];
 let lastDNA='',lastProtein='',apiAvailable=false;
+let lastRun = null;
 
 let chlamyctModelAvailable=false;
 async function checkAPIHealth(retries=4){
@@ -1743,16 +1882,47 @@ async function checkAPIHealth(retries=4){
     if(i<retries) await new Promise(r=>setTimeout(r,3000));
   }
   apiAvailable=false;dot.classList.remove('online');dot.classList.add('offline');label.textContent=t('api_offline');disableCTPills();
+  /* No capability query was answered: show the LM pills (greyed out, like the
+     CT pills) rather than hiding them on the strength of a failed probe. */
+  applyLMAvailability(null);
 }
 async function checkChlamyCTAvailability(){
   try{const r=await fetch('/api/info');if(r.ok){const d=await r.json();
     const ct=d.models&&d.models.find(m=>m.name==='ChlamyCodonTransformer');
     chlamyctModelAvailable=ct&&ct.available;
     if(!chlamyctModelAvailable){const p=document.getElementById('pill-chlamyct');p.classList.add('disabled');p.querySelector('input').disabled=true;p.title=currentLang==='ja'?'モデル未ロード':'Model not loaded';}
+    applyLMAvailability(d);
+    window.applyWorkspaceSpeciesGate?.();
+    return;
   }}catch(e){}
+  /* No capability information at all -> show the LM pills rather than hide a
+     working backend behind a failed probe. */
+  applyLMAvailability(null);
 }
-function enableCTPills(){document.getElementById('pill-basect').classList.remove('disabled');document.getElementById('pill-basect').querySelector('input').disabled=false;const c=document.getElementById('pill-chlamyct');c.classList.remove('disabled');c.querySelector('input').disabled=false;const d=document.getElementById('pill-chlamydesign');d.classList.remove('disabled');d.querySelector('input').disabled=false;}
-function disableCTPills(){document.getElementById('pill-basect').classList.add('disabled');document.getElementById('pill-basect').querySelector('input').disabled=true;document.getElementById('pill-chlamyct').classList.add('disabled');document.getElementById('pill-chlamyct').querySelector('input').disabled=true;document.getElementById('pill-chlamydesign').classList.add('disabled');document.getElementById('pill-chlamydesign').querySelector('input').disabled=true;}
+
+/* Reveal the ChloroplastLM pills based on /api/info.
+   - info.strategies present  -> show only the values the backend advertises
+                                 (an older backend would 422 on an unknown value)
+   - no info / no strategies  -> show all four (contract: "always show when the
+                                 capability query carries no information") */
+function applyLMAvailability(info){
+  const advertised=info&&Array.isArray(info.strategies)?info.strategies:null;
+  for(const s of LM_STRATEGIES){
+    const pill=document.getElementById(LM_PILL_IDS[s]);
+    if(!pill)continue;
+    const show=!advertised||advertised.includes(s);
+    pill.classList.toggle('hidden',!show);
+    if(!show&&pill.querySelector('input').checked){
+      document.querySelector('input[name="strategy"][value="cai_max"]').checked=true;
+      updateStrategyPanel();
+    }
+  }
+}
+function enableCTPills(){document.getElementById('pill-basect').classList.remove('disabled');document.getElementById('pill-basect').querySelector('input').disabled=false;const c=document.getElementById('pill-chlamyct');c.classList.remove('disabled');c.querySelector('input').disabled=false;const d=document.getElementById('pill-chlamydesign');d.classList.remove('disabled');d.querySelector('input').disabled=false;setLMPillsEnabled(true);}
+function disableCTPills(){document.getElementById('pill-basect').classList.add('disabled');document.getElementById('pill-basect').querySelector('input').disabled=true;document.getElementById('pill-chlamyct').classList.add('disabled');document.getElementById('pill-chlamyct').querySelector('input').disabled=true;document.getElementById('pill-chlamydesign').classList.add('disabled');document.getElementById('pill-chlamydesign').querySelector('input').disabled=true;setLMPillsEnabled(false);}
+/* The ChloroplastLM models are served by the same API, so they follow the same
+   online/offline gate as the CT pills. */
+function setLMPillsEnabled(on){for(const s of LM_STRATEGIES){const p=document.getElementById(LM_PILL_IDS[s]);if(!p)continue;p.classList.toggle('disabled',!on);p.querySelector('input').disabled=!on;}}
 
 selectedOrganism='Chlamydomonas reinhardtii chloroplast';disableCTPills();checkAPIHealth();loadOrganisms();orgSearch.value=selectedOrganism;updateOrganismUI();
 
@@ -1771,13 +1941,48 @@ document.getElementById('seq-input').addEventListener('input',function(){
     const c = cleanProtein(this.value);
     document.getElementById('seq-len').textContent = c.replace(/[_*]/g,'').length + ' aa';
     document.getElementById('translated-preview').classList.remove('visible');
+    // 貼った瞬間に気づけるよう、実行を待たずに知らせる
+    if (looksLikeDNA(c)) showError(t('err_looks_like_dna'));
   }
 });
-document.querySelectorAll('input[name="strategy"]').forEach(r=>{r.addEventListener('change',function(){document.getElementById('slider-panel').classList.remove('visible');});});
+document.querySelectorAll('input[name="strategy"]').forEach(r=>{r.addEventListener('change',()=>{if(r.checked&&r.value==='cuo_handpick')document.getElementById('generation-mode').value='greedy';updateStrategyPanel();window.clearLegacyResults?.('optimize');});});
+document.getElementById('slider-temp').addEventListener('input',function(){document.getElementById('val-temp').textContent=Number(this.value).toFixed(1);});
+document.getElementById('slider-seqs').addEventListener('input',function(){document.getElementById('val-seqs').textContent=this.value;});
+
+function currentStrategy(){const el=document.querySelector('input[name="strategy"]:checked');return el?el.value:'cai_max';}
+
+/* All learned models share explicit sampling controls and saved seeds. */
+function updateStrategyPanel(){
+  const s=currentStrategy(), meaningful=CT_STRATEGIES.includes(s)||LM_STRATEGIES.includes(s);
+  const panel=document.getElementById('slider-panel');
+  panel.style.display=meaningful?'':'none';panel.classList.toggle('visible',meaningful);
+  document.getElementById('slider-row-seqs').style.display='none';
+  const mode=document.getElementById('generation-mode');
+  mode.disabled=s==='cai_max'||s==='bfc';
+  if(s==='cai_max')mode.value='greedy';else if(s==='bfc')mode.value='sample';
+  const tempInput=document.getElementById('slider-temp');
+  tempInput.disabled=mode.value==='greedy';
+  document.getElementById('optimization-seed').disabled=mode.value==='greedy';
+  tempInput.min=CT_STRATEGIES.includes(s)?'0.1':'0';
+  tempInput.max='2.5';
+  if(meaningful&&Number(tempInput.value)<Number(tempInput.min))tempInput.value=tempInput.min;
+  document.getElementById('val-temp').textContent=Number(tempInput.value).toFixed(1);
+  const hint=document.getElementById('slider-hint');
+  hint.textContent=currentLang==='ja'?'温度と seed を保存します。同じ配列・モデル版・条件で再実行できます。':'Temperature and seed are saved with the sequence and model version.';
+  hint.classList.toggle('visible',meaningful);
+  window.updateHandpickPanel?.(s);
+  window.clearLegacyResults?.('optimize');
+}
+
 document.getElementById('sa-dna-input').addEventListener('input',function(){document.getElementById('sa-seq-len').textContent=this.value.replace(/[^ATGCatgc]/g,'').length+' nt';});
 document.getElementById('pa-protein-input').addEventListener('input',function(){document.getElementById('pa-seq-len').textContent=this.value.trim().toUpperCase().replace(/[^A-Z]/g,'').length+' aa';});
 
 function cleanProtein(r){return r.trim().toUpperCase().replace(/\s+/g,'');}
+// ⚠️ A/C/G/T は有効なアミノ酸1文字表記（Ala/Cys/Gly/Thr）なので、PROTEIN モードに
+//    DNA を貼ると「その塩基数＝残基数のタンパク質」として黙って受理され、
+//    3倍長のナンセンスCDSが設計される。20残基以上が ACGT のみのタンパク質は
+//    事実上存在しないので、DNA とみなして止める（勝手にモードを切り替えはしない）。
+function looksLikeDNA(s){const c=s.replace(/[_*]$/,'');return c.length>=20&&/^[ACGT]+$/.test(c);}
 function validateProtein(s){if(!s||!s.length)return t('err_empty');const c=s.replace(/[_*]$/,'');if(c.length<3)return t('err_short');if(c.length>3000)return t('err_long');for(const a of c)if(!VALID_AA.has(a))return t('err_invalid_aa',{aa:a});return null;}
 function showError(m){document.getElementById('seq-input').classList.add('error');document.getElementById('err-text').textContent=m;document.getElementById('err-msg').classList.add('visible');}
 function clearError(){document.getElementById('seq-input').classList.remove('error');document.getElementById('err-msg').classList.remove('visible');}
@@ -1786,7 +1991,15 @@ function optimizeLocal(p,s){if(!clientCodonFreq)return null;let d='';for(const a
 function calcGC(d){let g=0;for(const b of d)if(b==='G'||b==='C')g++;return g/d.length*100;}
 function calcCSI(d){if(!clientCodonFreq)return 0;const l=[];for(let i=0;i<d.length-3;i+=3){const c=d.slice(i,i+3);let a=null;for(const[k,m]of Object.entries(clientCodonFreq)){if(c in m){a=k;break;}}if(!a||a==='M')continue;const f=clientCodonFreq[a];const mx=Math.max(...Object.values(f));const w=(f[c]||.001)/mx;l.push(Math.log(w));}if(!l.length)return 0;return Math.exp(l.reduce((a,b)=>a+b,0)/l.length);}
 
-async function callAPI(ep,body){const c=new AbortController();const to=setTimeout(()=>c.abort(),120000);const o={method:body?'POST':'GET',headers:{'Content-Type':'application/json'},signal:c.signal};if(body)o.body=JSON.stringify(body);const r=await fetch('/api/'+ep,o);clearTimeout(to);if(!r.ok){const d=await r.text();throw new Error(d);}return r.json();}
+async function callAPI(ep,body){
+  const hosted=['chlamydesign.web.app','chlamydesign.firebaseapp.com','codondesign.web.app'].includes(location.hostname);
+  const longRun=['predict','workspace/optimize'].includes(ep);
+  const url=longRun&&hosted?'https://chlamydesign-api-o45oopbhna-uc.a.run.app/api/'+ep:'/api/'+ep;
+  const c=new AbortController();const to=setTimeout(()=>c.abort(),longRun?580000:60000);
+  try{const o={method:body?'POST':'GET',headers:{'Content-Type':'application/json'},signal:c.signal};if(body)o.body=JSON.stringify(body);
+    const r=await fetch(url,o);if(!r.ok){let detail;try{const d=await r.json();detail=typeof d.detail==='string'?d.detail:JSON.stringify(d.detail||d);}catch{detail='Request failed ('+r.status+')';}throw new Error(detail);}return await r.json();
+  }catch(e){if(c.signal.aborted)throw new Error(currentLang==='ja'?'計算が制限時間を超えました。配列長と設定を確認してください。':'Calculation timed out. Please check the sequence length and settings.');throw e;}finally{clearTimeout(to);}
+}
 
 function validateDNAInput(dna) {
   if (!dna || !dna.length) return t('err_dna_empty');
@@ -1794,59 +2007,111 @@ function validateDNAInput(dna) {
   if (dna.length > 9000) return t('err_dna_long_opt');
   if (/[^ATGC]/i.test(dna)) return t('err_dna_invalid');
   if (dna.length % 3 !== 0) return t('err_dna_not_triplet');
+  for(let i=0;i<dna.length-3;i+=3)if(STOP_CODONS.includes(dna.slice(i,i+3)))return currentLang==='ja'?'配列の途中に終止コドンがあります（'+(i+1)+' 塩基目）。CDS の範囲を確認してください。':'Internal stop codon at base '+(i+1)+'. Check the CDS boundaries.';
   return null;
 }
-async function runOptimization(){clearError();const raw=document.getElementById('seq-input').value;
-let protein;
-if (inputType === 'dna') {
-  const dna = raw.toUpperCase().replace(/\s+/g,'').replace(/[^ATGC]/g,'');
-  const dnaErr = validateDNAInput(dna);
-  if (dnaErr) { showError(dnaErr); return; }
-  protein = translateDNA(dna) + '_';
-} else {
-  protein = cleanProtein(raw);
+async function runOptimization(){
+  clearError();const raw=document.getElementById('seq-input').value, source=normalizedInput(raw), settings=legacySettings('optimize');
+  let protein;
+  if (settings.inputType === 'dna') {const err=validateDNAInput(source);if(err){showError(err);return;}protein=translateDNA(source)+'_';}
+  else {protein=cleanProtein(raw);if(looksLikeDNA(protein)){showError(t('err_looks_like_dna'));return;}}
+  const err=validateProtein(protein);if(err){showError(err);return;}
+  if(!settings.organism){showError(currentLang==='ja'?'対象生物種を選択してください。':'Please select a target organism.');return;}
+  if(!Number.isInteger(settings.seed)||settings.seed<0||settings.seed>2147483640){showError(currentLang==='ja'?'Seed は 0〜2147483640 の整数にしてください。':'Seed must be an integer between 0 and 2147483640.');return;}
+  if(settings.strategy==='cuo_handpick'){await runHandpickOptimization(source,protein,settings);return;}
+  if(!apiAvailable){showError(t('err_api')+'API offline.');return;}
+  const organismEntry=allOrganisms.find(item=>item.name===settings.organism);
+  const species=settings.organism==='Chlamydomonas reinhardtii chloroplast'?'cre-chloroplast':organismEntry?'ct-'+organismEntry.id:null;
+  if(!species){showError(currentLang==='ja'?'生物種一覧を読み込み直してください。':'Please reload the organism list.');return;}
+  const run=beginLegacyRun('optimize',source,settings), core=protein.replace(/[_*]$/,'');
+  const btn=document.getElementById('run-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> '+t('btn_generating');
+  try{
+    const model=settings.strategy.replace(/^ar_/, 'ar-').replace(/^mlm_/, 'mlm-');
+    const request={sequence:source,kind:settings.inputType==='dna'?'cds':'protein',model,species,temperature:settings.temperature,nCandidates:1,seed:settings.seed,generationMode:settings.generationMode};
+    const response=settings.execution==='durable'
+      ? await window.runCodonOptimization(request,{workspaceId:run.workspaceId,nodeId:run.nodeId,revisionId:run.revisionId,nodeName:run.name,legacyRunId:run.runId,sequence:source,kind:run.kind,settings,sourceRunId:run.sourceRunId,scope:run.scope})
+      : await callAPI('workspace/optimize',request);
+    const candidate=response.candidates?.[0];if(!candidate?.sequence)throw new Error('No valid candidate returned');
+    let metrics=null;
+    try{metrics=await callAPI('evaluate',{dna_sequence:candidate.sequence,organism:settings.organism});}catch(e){/* Candidate remains usable; missing metrics are explicit. */}
+    const result={...candidate,...response,runId:response.runId||run.runId,sourceRevisionId:run.revisionId,outputRevisionId:crypto.randomUUID(),predicted_dna:candidate.sequence,gc3_percent:candidate.gc3,temperature:settings.temperature,generationMode:settings.generationMode,metrics};
+    finishLegacyRun(run,result,{organism:settings.organism,strategy:settings.strategy,proteinInput:core+'_',originalInput:source,originalInputType:settings.inputType,dnaOutput:candidate.sequence,gcPercent:metrics?.gc_percent??candidate.gc,csi:metrics?.csi??null,lengthNt:candidate.sequence.length,lengthAa:core.length,startCodon:candidate.sequence.slice(0,3),stopCodon:candidate.sequence.slice(-3),seed:candidate.seed??settings.seed,temperature:settings.temperature,generationMode:settings.generationMode,warnings:candidate.warnings??[],numCandidates:1},()=>{
+      lastDNA=candidate.sequence;lastProtein=core;showResults(lastDNA,core,settings.strategy,result,settings.organism);if(metrics)showExtendedMetrics(metrics);
+    });
+  }catch(e){failLegacyRun(run,e);if(legacyCanRender(run))showError(t('err_api')+(e.message||'Unknown'));}
+  finally{resetButton();}
 }
-const err=validateProtein(protein);if(err){showError(err);return;}
-if(!selectedOrganism){showError(currentLang==='ja'?'対象生物種を選択してください。':'Please select a target organism.');return;}
-const strategy=document.querySelector('input[name="strategy"]:checked').value;const btn=document.getElementById('run-btn');btn.disabled=true;
-const isCT=CT_STRATEGIES.includes(strategy);const core=protein.replace(/[_*]$/,'');const proteinWithStop=core+'_';const needsAPI=isCT||!clientCodonFreq;
-if(needsAPI&&!apiAvailable){showError(t('err_api')+'API offline.');btn.disabled=false;return;}
-if(needsAPI){btn.innerHTML='<span class="spinner"></span> '+t(isCT?'btn_generating':'btn_optimizing');
-  try{const body={protein:proteinWithStop,strategy,organism:selectedOrganism};if(strategy==='chlamydesign'){body.num_sequences=10;body.temperature=0.2;}else if(isCT){body.num_sequences=1;body.temperature=0.2;}
-  const result=await callAPI('predict',body);lastDNA=result.predicted_dna;lastProtein=core;showResults(lastDNA,core,strategy,result);fetchExtendedMetrics(lastDNA);
-  saveHistory('optimize',{organism:selectedOrganism,strategy,proteinInput:proteinWithStop,dnaOutput:lastDNA,gcPercent:calcGC(lastDNA),csi:calcCSI(lastDNA),lengthNt:lastDNA.length,lengthAa:core.length,startCodon:lastDNA.slice(0,3),stopCodon:lastDNA.slice(-3)});}catch(e){showError(t('err_api')+(e.message||'Unknown'));}finally{resetButton();}}
-else{btn.innerHTML='<span class="spinner"></span> '+t('btn_optimizing');setTimeout(()=>{try{const dna=optimizeLocal(core,strategy);lastDNA=dna;lastProtein=core;showResults(dna,core,strategy);if(apiAvailable)fetchExtendedMetrics(dna);
-  saveHistory('optimize',{organism:selectedOrganism,strategy,proteinInput:core+'_',dnaOutput:dna,gcPercent:calcGC(dna),csi:calcCSI(dna),lengthNt:dna.length,lengthAa:core.length,startCodon:dna.slice(0,3),stopCodon:dna.slice(-3)});}finally{resetButton();}},30);}}
 
 function resetButton(){const btn=document.getElementById('run-btn');btn.disabled=false;btn.innerHTML='<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg> <span data-i18n="btn_optimize">'+t('btn_optimize')+'</span>';}
 
-async function fetchExtendedMetrics(dna){try{const r=await callAPI('evaluate',{dna_sequence:dna,organism:selectedOrganism});showExtendedMetrics(r);}catch(e){}}
+async function fetchExtendedMetrics(dna,organism,run){try{const r=await callAPI('evaluate',{dna_sequence:dna,organism});if(run&&legacyCanRender(run)&&lastDNA===dna)showExtendedMetrics(r);return r;}catch(e){return null;}}
+function metricNumber(value,digits=1,suffix=''){return typeof value==='number'&&Number.isFinite(value)?value.toFixed(digits)+suffix:'—';}
+function metricWidth(value){return typeof value==='number'&&Number.isFinite(value)?Math.max(0,Math.min(100,value))+'%':'0%';}
 
-function showResults(dna,protein,strategy,apiResult){const gc=calcGC(dna);const csi=calcCSI(dna);const ntLen=dna.length;const aaLen=protein.length;const start=dna.slice(0,3);const stop=dna.slice(-3);
+/* GC content of the third codon position. Used as a fallback when the API
+   response carries no gc3_percent, so GC3 is shown for every strategy. */
+function calcGC3(d){let n=0,g=0;const end=/^(TAA|TAG|TGA)$/.test(d.slice(-3))?d.length-3:d.length;for(let i=2;i<end;i+=3){const b=d[i];if(!'ACGT'.includes(b))continue;if(b==='G'||b==='C')g++;n++;}return n?g/n*100:0;}
+
+/* Render gc3_percent / seed / warnings[] from a /api/predict response.
+   Everything that can originate from the server is written with textContent
+   (never innerHTML), so warning strings cannot inject markup. */
+function renderRunExtras(dna,apiResult){
+  const r=apiResult||{};
+
+  /* GC3 — next to the existing GC% value. */
+  const gc3El=document.getElementById('m-gc3');
+  const gc3=(typeof r.gc3_percent==='number'&&isFinite(r.gc3_percent))?r.gc3_percent:(dna?calcGC3(dna):null);
+  if(gc3===null){gc3El.textContent='';gc3El.classList.remove('visible');}
+  else{gc3El.textContent='GC3 '+gc3.toFixed(1)+'%';gc3El.classList.add('visible');
+    gc3El.style.color=gc3>60?'var(--red)':gc3>35?'var(--amber)':'var(--text-secondary)';}
+
+  /* Seed — shown when the backend reports one (temperature > 0 runs). */
+  const meta=document.getElementById('run-meta');
+  if(r.seed!==undefined&&r.seed!==null){meta.textContent='seed='+String(r.seed);meta.classList.add('visible');}
+  else{meta.textContent='';meta.classList.remove('visible');}
+
+  /* Warnings — always visible when present, never collapsed behind a toggle. */
+  const box=document.getElementById('warn-box'),list=document.getElementById('warn-list');
+  while(list.firstChild)list.removeChild(list.firstChild);
+  const warnings=Array.isArray(r.warnings)?r.warnings.filter(w=>typeof w==='string'&&w.trim()):[];
+  if(warnings.length){
+    for(const w of warnings){const li=document.createElement('li');li.textContent=w;list.appendChild(li);}
+    box.classList.add('visible');
+  }else{box.classList.remove('visible');}
+}
+
+function showResults(dna,protein,strategy,apiResult,organism=selectedOrganism){lastRun={dna,protein,strategy,organism,runId:apiResult?.runId??null,sourceRevisionId:apiResult?.sourceRevisionId??null,modelVersion:apiResult?.modelVersion??null,handpick:apiResult?.handpick??null,generationMode:apiResult?.generationMode??null,outputRevisionId:apiResult?.outputRevisionId??null,seed:apiResult?.seed??null,temperature:apiResult?.temperature??null,warnings:apiResult?.warnings??[],metrics:apiResult?.metrics??null};const gc=apiResult?.metrics?.gc_percent??calcGC(dna);const csi=apiResult?.metrics?.csi??apiResult?.csi??null;const ntLen=dna.length;const aaLen=protein.length;const start=dna.slice(0,3);const stop=dna.slice(-3);
 document.getElementById('m-gc').textContent=gc.toFixed(1)+'%';const gcPct=Math.min(gc/70*100,100);const gcBar=document.getElementById('m-gc-bar');gcBar.style.width=gcPct+'%';gcBar.className='metric-bar-fill'+(gc>55?' bad':gc>42?' warn':'');
 document.getElementById('m-len').textContent=ntLen+' nt';document.getElementById('m-len-sub').textContent=aaLen+' aa · '+(ntLen/3|0)+' codons';
-document.getElementById('m-csi').textContent=csi.toFixed(3);document.getElementById('m-csi-bar').style.width=(csi*100)+'%';
+document.getElementById('m-csi').textContent=metricNumber(csi,3);document.getElementById('m-csi-bar').style.width=metricWidth(csi===null?null:csi*100);
 document.getElementById('m-startstop').textContent=start+' / '+stop;const ok=(start==='ATG'||start==='GTG')&&STOP_CODONS.includes(stop);document.getElementById('m-startstop-sub').textContent=ok?t('metric_startstop_valid'):t('metric_startstop_check');document.getElementById('m-startstop-sub').style.color=ok?'var(--green)':'var(--amber)';
+renderRunExtras(dna,apiResult);
 /* ChlamyDesign: show base_strategy and biological scores */
 const bioInfo=document.getElementById('chlamydesign-info');
-if(strategy==='chlamydesign'&&apiResult){const bs=apiResult.base_strategy||'base_ct';const parts=[(currentLang==='ja'?'ベースモデル: ':'Base model: ')+'<strong>'+(bs==='chlamyct'?'ChlamyCT':'Base CT')+'</strong>'];if(apiResult.five_prime_mfe!=null)parts.push("5' MFE: "+apiResult.five_prime_mfe.toFixed(2)+' kcal/mol');if(apiResult.cps_score!=null)parts.push('CPS: '+apiResult.cps_score.toFixed(4));if(apiResult.five_prime_context_score!=null)parts.push((currentLang==='ja'?"5'文脈: ":"5' ctx: ")+apiResult.five_prime_context_score.toFixed(3));bioInfo.innerHTML=parts.join(' · ');bioInfo.classList.add('visible');}else{bioInfo.classList.remove('visible');bioInfo.innerHTML='';}
+if(strategy==='cuo_handpick'&&apiResult?.handpick){const hp=apiResult.handpick;bioInfo.textContent=t('handpick_result')+' · '+(hp.generationMode==='sample'?t('generation_sample'):t('handpick_most_frequent'))+' · '+t('handpick_cai')+': '+metricNumber(hp.handpickCAI,3);bioInfo.classList.add('visible');}
+else if(strategy==='chlamydesign'&&apiResult?.base_strategy){const bs=apiResult.base_strategy||'base_ct';const parts=[(currentLang==='ja'?'ベースモデル: ':'Base model: ')+'<strong>'+(bs==='chlamyct'?'ChlamyCT':'Base CT')+'</strong>'];if(apiResult.five_prime_mfe!=null)parts.push("5' MFE: "+metricNumber(apiResult.five_prime_mfe,2)+' kcal/mol');if(apiResult.cps_score!=null)parts.push('CPS: '+metricNumber(apiResult.cps_score,4));if(apiResult.five_prime_context_score!=null)parts.push((currentLang==='ja'?"5'文脈: ":"5' ctx: ")+metricNumber(apiResult.five_prime_context_score,3));bioInfo.innerHTML=parts.join(' · ');bioInfo.classList.add('visible');}else{bioInfo.classList.remove('visible');bioInfo.innerHTML='';}
 hideExtendedMetrics();
-const codons=[];for(let i=0;i<dna.length;i+=3)codons.push(dna.slice(i,i+3));document.getElementById('dna-colored').innerHTML=codons.map(c=>`<span class="codon">${c}</span>`).join('');
+const codons=[];for(let i=0;i<dna.length;i+=3)codons.push(dna.slice(i,i+3));document.getElementById('dna-colored').innerHTML=codons.map(c=>`<span class="codon">${escapeHTML(c)}</span>`).join('');
 document.getElementById('results').classList.add('visible');document.getElementById('results').scrollIntoView({behavior:'smooth',block:'nearest'});}
 
-function showExtendedMetrics(r){if(r.csi!==undefined){document.getElementById('m-csi').textContent=r.csi.toFixed(3);document.getElementById('m-csi-bar').style.width=(r.csi*100)+'%';}
-if(r.gc_percent!==undefined){document.getElementById('m-gc').textContent=r.gc_percent.toFixed(1)+'%';const p=Math.min(r.gc_percent/70*100,100);const b=document.getElementById('m-gc-bar');b.style.width=p+'%';b.className='metric-bar-fill'+(r.gc_percent>55?' bad':r.gc_percent>42?' warn':'');}
-showMetricBox('box-cfd');document.getElementById('m-cfd').textContent=r.cfd.toFixed(3);document.getElementById('m-cfd-bar').style.width=(r.cfd*100)+'%';
-showMetricBox('box-minmax');document.getElementById('m-minmax').textContent=r.minmax_mean.toFixed(1);document.getElementById('m-minmax-bar').style.width=Math.min(r.minmax_mean,100)+'%';
-showMetricBox('box-cis');const c=document.getElementById('m-cis');c.textContent=r.cis_elements;c.style.color=r.cis_elements===0?'var(--green)':r.cis_elements<=2?'var(--amber)':'var(--red)';
-showMetricBox('box-mfe');document.getElementById('m-mfe').textContent=r.mfe!==null?r.mfe.toFixed(1):'N/A';
-showMetricBox('box-complexity');document.getElementById('m-complexity').textContent=r.complexity.toFixed(3);document.getElementById('m-complexity-bar').style.width=(r.complexity*100)+'%';}
+function showExtendedMetrics(r){
+  document.getElementById('m-csi').textContent=metricNumber(r.csi,3);document.getElementById('m-csi-bar').style.width=metricWidth(r.csi==null?null:r.csi*100);
+  document.getElementById('m-gc').textContent=metricNumber(r.gc_percent,1,'%');document.getElementById('m-gc-bar').style.width=metricWidth(r.gc_percent==null?null:r.gc_percent/70*100);
+  for(const [key,digits,scale] of [['cfd',3,100],['minmax',1,1],['complexity',3,100]]){
+    const value=r[key==='minmax'?'minmax_mean':key];showMetricBox('box-'+key);document.getElementById('m-'+key).textContent=metricNumber(value,digits);document.getElementById('m-'+key+'-bar').style.width=metricWidth(value==null?null:value*scale);
+  }
+  showMetricBox('box-cis');const c=document.getElementById('m-cis');c.textContent=metricNumber(r.cis_elements,0);c.style.color=r.cis_elements==null?'var(--muted)':r.cis_elements===0?'var(--green)':r.cis_elements<=2?'var(--amber)':'var(--red)';
+  showMetricBox('box-mfe');document.getElementById('m-mfe').textContent=metricNumber(r.mfe,1);
+  if(Array.isArray(r.warnings)&&r.warnings.length){const list=document.getElementById('warn-list');for(const warning of r.warnings){const li=document.createElement('li');li.textContent=warning;list.append(li);}document.getElementById('warn-box').classList.add('visible');}
+}
+
 function showMetricBox(id){document.getElementById(id).style.display='';}
 function hideExtendedMetrics(){['box-cfd','box-minmax','box-cis','box-mfe','box-complexity'].forEach(id=>document.getElementById(id).style.display='none');}
 
 function copyDNA(){navigator.clipboard.writeText(lastDNA).then(()=>{const b=document.querySelector('.copy-btn');b.textContent=t('btn_copied');setTimeout(()=>b.textContent=t('btn_copy'),1500);});}
-function downloadFasta(){if(!lastDNA)return;const h=`>CodonDesign|${document.querySelector('input[name="strategy"]:checked').value}|${selectedOrganism}|${lastProtein.length}aa`;const s=lastDNA.match(/.{1,60}/g).join('\n');triggerDownload(new Blob([h+'\n'+s+'\n'],{type:'text/plain'}),'codondesign.fasta');}
-function downloadCSV(){if(!lastDNA)return;const s=document.querySelector('input[name="strategy"]:checked').value;const rows=['strategy,organism,dna,protein,gc_percent,csi,length_nt,length_aa',`${s},"${selectedOrganism}",${lastDNA},${lastProtein}_,${calcGC(lastDNA).toFixed(2)},${calcCSI(lastDNA).toFixed(4)},${lastDNA.length},${lastProtein.length}`];triggerDownload(new Blob([rows.join('\n')+'\n'],{type:'text/csv'}),'codondesign.csv');}
+function downloadFasta(){if(!lastDNA)return;const hp=lastRun?.handpick;const details=hp?'|'+hp.modelVersion+'|mode='+hp.generationMode+'|seed='+hp.seed+'|minWeight='+hp.minWeight+'|avoidBadPairs='+hp.avoidBadPairs+'|minPairScore='+hp.minPairScore:'';const h=`>CodonDesign|${lastRun?.strategy || ''}|${lastRun?.organism || ''}|${lastProtein.length}aa${details}`;const s=lastDNA.match(/.{1,60}/g).join('\n');triggerDownload(new Blob([h+'\n'+s+'\n'],{type:'text/plain'}),'codondesign.fasta');}
+function downloadCSV(){if(!lastRun?.dna)return;const run=lastRun;const rows=['strategy,organism,dna,protein,gc_percent,csi,length_nt,length_aa',`${run.strategy},"${run.organism}",${run.dna},${run.protein}_,${calcGC(run.dna).toFixed(2)},${metricNumber(run.metrics?.csi,4)},${run.dna.length},${run.protein.length}`];triggerDownload(new Blob([rows.join('\n')+'\n'],{type:'text/csv'}),'codondesign.csv');}
+
 function triggerDownload(b,n){const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=n;a.click();URL.revokeObjectURL(u);}
 
 // ══════════════════════════════════════════════════════════════════
@@ -1855,22 +2120,22 @@ function triggerDownload(b,n){const u=URL.createObjectURL(b);const a=document.cr
 const ENZYME_SETS={common:null,golden_gate:['BsaI','BbsI','BpiI','Esp3I','SapI','BsmBI'],gibson:['EcoRI','BamHI','HindIII','XbaI','SalI','PstI','SphI','KpnI','NcoI','NdeI','XhoI','NotI','BglII','NheI','SpeI','MluI']};
 const RE_SITES={EcoRI:'GAATTC',BamHI:'GGATCC',HindIII:'AAGCTT',XbaI:'TCTAGA',SalI:'GTCGAC',PstI:'CTGCAG',SphI:'GCATGC',KpnI:'GGTACC',NcoI:'CCATGG',NdeI:'CATATG',XhoI:'CTCGAG',NotI:'GCGGCCGC',BglII:'AGATCT',ClaI:'ATCGAT',EcoRV:'GATATC',SacI:'GAGCTC',NheI:'GCTAGC',SpeI:'ACTAGT',MluI:'ACGCGT',SmaI:'CCCGGG',BsaI:'GGTCTC',BbsI:'GAAGAC',SapI:'GCTCTTC'};
 
-async function runRestriction(){const dna=document.getElementById('sa-dna-input').value.trim().toUpperCase().replace(/[^ATGC]/g,'');const eE=document.getElementById('re-err-msg'),eT=document.getElementById('re-err-text');eE.classList.remove('visible');
-if(!dna){eT.textContent=t('err_dna_empty');eE.classList.add('visible');return;}
-if(!apiAvailable){runRestrictionLocal(dna);return;}
-const btn=document.getElementById('re-run-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> '+t('re_run_btn');
-try{const es=document.getElementById('re-enzyme-set').value;const body={dna_sequence:dna};if(ENZYME_SETS[es])body.enzymes=ENZYME_SETS[es];const r=await callAPI('restriction',body);displayRestrictionResults(r);}catch(e){runRestrictionLocal(dna);}
-finally{btn.disabled=false;btn.innerHTML='<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg> <span data-i18n="re_run_btn">'+t('re_run_btn')+'</span>';}}
-
-function runRestrictionLocal(dna){const es=document.getElementById('re-enzyme-set').value;let ec=RE_SITES;if(es==='golden_gate')ec={BsaI:'GGTCTC',BbsI:'GAAGAC',SapI:'GCTCTTC'};else if(es==='gibson'){ec={};for(const e of ENZYME_SETS.gibson)if(RE_SITES[e])ec[e]=RE_SITES[e];}
-const results=[];let total=0;for(const[n,site]of Object.entries(ec)){const pos=[];let i=dna.indexOf(site);while(i!==-1){pos.push(i+1);i=dna.indexOf(site,i+1);}const rc=reverseComplement(site);if(rc!==site){i=dna.indexOf(rc);while(i!==-1){pos.push(i+1);i=dna.indexOf(rc,i+1);}}pos.sort((a,b)=>a-b);if(pos.length){total+=pos.length;const frags=[];let prev=0;for(const p of pos){frags.push(p-prev);prev=p;}frags.push(dna.length-prev);results.push({enzyme:n,recognition_site:site,cut_positions:pos,num_cuts:pos.length,fragment_sizes:frags});}}
-results.sort((a,b)=>b.num_cuts-a.num_cuts);displayRestrictionResults({total_enzymes_checked:Object.keys(ec).length,total_sites_found:total,length_nt:dna.length,enzymes:results});}
+async function runRestriction(){
+  const dna=legacyInput('restriction'),eE=document.getElementById('re-err-msg'),eT=document.getElementById('re-err-text');eE.classList.remove('visible');
+  if(!dna||/[^ACGT]/.test(dna)){eT.textContent=t(dna?'err_dna_invalid':'err_dna_empty');eE.classList.add('visible');return;}
+  if(!apiAvailable){eT.textContent=currentLang==='ja'?'正確な切断位置の計算には API 接続が必要です。':'Connect to the API to calculate exact cleavage positions.';eE.classList.add('visible');return;}
+  const settings=legacySettings('restriction'),run=beginLegacyRun('restriction',dna,settings);
+  const btn=document.getElementById('re-run-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> '+t('re_run_btn');
+  try{const body={dna_sequence:dna};if(ENZYME_SETS[settings.enzymeSet])body.enzymes=ENZYME_SETS[settings.enzymeSet];const r=await callAPI('restriction',body);
+    finishLegacyRun(run,r,{dnaInput:dna,enzymeSet:settings.enzymeSet,lengthNt:r.length_nt,totalSites:r.total_sites_found,enzymesChecked:r.total_enzymes_checked,uniqueCutters:r.enzymes.filter(e=>e.num_cuts===1).length},()=>displayRestrictionResults(r));
+  }catch(e){failLegacyRun(run,e);if(legacyCanRender(run)){eT.textContent=e.message||'Error';eE.classList.add('visible');}}
+  finally{btn.disabled=false;btn.innerHTML='<span data-i18n="re_run_btn">'+t('re_run_btn')+'</span>';}
+}
 
 function reverseComplement(s){const c={A:'T',T:'A',G:'C',C:'G'};return s.split('').reverse().map(b=>c[b]||b).join('');}
 
 function displayRestrictionResults(r){const c=document.getElementById('re-results');c.style.display='block';const uc=r.enzymes.filter(e=>e.num_cuts===1).length;
-  const dnaVal=document.getElementById('sa-dna-input').value.trim().toUpperCase().replace(/[^ATGC]/g,'');
-  saveHistory('restriction',{dnaInput:dnaVal.slice(0,2000),lengthNt:r.length_nt,totalSites:r.total_sites_found,enzymesChecked:r.total_enzymes_checked,uniqueCutters:uc});
+
 let h=`<div class="re-summary" style="margin-top:16px"><div class="re-summary-item"><div class="re-summary-value">${r.total_enzymes_checked}</div><div class="re-summary-label">${t('re_summary_enzymes')}</div></div><div class="re-summary-item"><div class="re-summary-value">${r.total_sites_found}</div><div class="re-summary-label">${t('re_summary_sites')}</div></div><div class="re-summary-item"><div class="re-summary-value">${uc}</div><div class="re-summary-label">${t('re_summary_unique')}</div></div></div>`;
 if(!r.enzymes.length){h+=`<p style="color:var(--green);font-weight:600;font-size:.88rem">${t('re_no_sites')}</p>`;}
 else{h+='<div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border-lt)"><table class="re-table"><thead><tr><th>'+t('re_col_enzyme')+'</th><th>'+t('re_col_site')+'</th><th>'+t('re_col_cuts')+'</th><th>'+t('re_col_positions')+'</th><th>'+t('re_col_fragments')+'</th></tr></thead><tbody>';
@@ -2018,60 +2283,15 @@ let rna2dZoom = 1;
 let rna2dPanX = 0, rna2dPanY = 0;
 let rna2dDragging = false, rna2dDragStartX = 0, rna2dDragStartY = 0;
 
-async function runRNAStructure() {
-  let dna = document.getElementById('sa-dna-input').value.trim().toUpperCase().replace(/[^ATGC]/g, '');
-  const eE = document.getElementById('rna-err-msg'), eT = document.getElementById('rna-err-text');
-  eE.classList.remove('visible');
-  if (!dna) { eT.textContent = t('err_dna_empty'); eE.classList.add('visible'); return; }
-  // Prepend 5' UTR if provided
-  const utrInput = document.getElementById('rna-utr-input').value.trim().toUpperCase().replace(/[^ATGC]/g, '');
-  if (utrInput) dna = utrInput + dna;
-  const btn = document.getElementById('rna-run-btn');
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> ' + t('rna_run_btn');
-  const region = document.getElementById('rna-region').value;
-  try {
-    if (apiAvailable) {
-      const r = await callAPI('rna-structure', { dna_sequence: dna, region });
-      r._source = r.source || 'vienna';
-      displayRNAResults(r);
-    } else {
-      let seq = dna, rl = 'full';
-      if (region === '5utr') { seq = dna.slice(0, 100); rl = "5' UTR"; }
-      if (region === '3utr') { seq = dna.slice(-100); rl = "3' UTR"; }
-      const rna = seq.replace(/T/g, 'U');
-      const gc = (seq.match(/[GC]/g) || []).length / seq.length * 100;
-      const structure = nussinovFold(rna);
-      const mfe = calcMFEFromPairs(rna, structure);
-      const bpCount = countBasePairs(structure);
-      displayRNAResults({
-        sequence: rna, structure: structure, mfe: mfe,
-        length_nt: rna.length, gc_percent: gc, base_pair_count: bpCount,
-        region: rl, _source: 'nussinov'
-      });
-    }
-  } catch (e) {
-    // Fallback to Nussinov on API error
-    try {
-      let seq = dna, rl = 'full';
-      if (region === '5utr') { seq = dna.slice(0, 100); rl = "5' UTR"; }
-      if (region === '3utr') { seq = dna.slice(-100); rl = "3' UTR"; }
-      const rna = seq.replace(/T/g, 'U');
-      const gc = (seq.match(/[GC]/g) || []).length / seq.length * 100;
-      const structure = nussinovFold(rna);
-      const mfe = calcMFEFromPairs(rna, structure);
-      const bpCount = countBasePairs(structure);
-      displayRNAResults({
-        sequence: rna, structure: structure, mfe: mfe,
-        length_nt: rna.length, gc_percent: gc, base_pair_count: bpCount,
-        region: rl + ' (fallback)', _source: 'nussinov'
-      });
-    } catch (e2) {
-      eT.textContent = t('err_api') + (e.message || ''); eE.classList.add('visible');
-    }
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg> <span data-i18n="rna_run_btn">' + t('rna_run_btn') + '</span>';
-  }
+async function runRNAStructure(){
+  const source=legacyInput('rna'),settings=legacySettings('rna');const eE=document.getElementById('rna-err-msg'),eT=document.getElementById('rna-err-text');eE.classList.remove('visible');
+  if(!source||/[^ACGT]/.test(source+settings.utr5)){eT.textContent=t(source?'err_dna_invalid':'err_dna_empty');eE.classList.add('visible');return;}
+  if(!apiAvailable){eT.textContent=currentLang==='ja'?'RNA のエネルギー計算には API 接続が必要です。':'Connect to the API to calculate RNA folding energy.';eE.classList.add('visible');return;}
+  const run=beginLegacyRun('rna',source,settings),btn=document.getElementById('rna-run-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> '+t('rna_run_btn');
+  try{const r=await callAPI('rna-structure',{dna_sequence:settings.utr5+source,region:settings.region});r._source=r.source||'vienna';
+    finishLegacyRun(run,r,{dnaInput:source,utr5:settings.utr5,lengthNt:r.length_nt,mfe:r.mfe??null,gcPercent:r.gc_percent??null,basePairCount:r.base_pair_count,region:settings.region},()=>displayRNAResults(r));
+  }catch(e){failLegacyRun(run,e);if(legacyCanRender(run)){eT.textContent=e.message||'Error';eE.classList.add('visible');}}
+  finally{btn.disabled=false;btn.innerHTML='<span data-i18n="rna_run_btn">'+t('rna_run_btn')+'</span>';}
 }
 
 function displayRNAResults(r) {
@@ -2079,17 +2299,16 @@ function displayRNAResults(r) {
   c.style.display = 'block';
   rnaCurrentResults = r;
   rnaCurrentMode = 'mfe';
-  const dnaVal = document.getElementById('sa-dna-input').value.trim().toUpperCase().replace(/[^ATGC]/g, '');
-  saveHistory('rna', { dnaInput: dnaVal.slice(0, 2000), lengthNt: r.length_nt, mfe: r.mfe, gcPercent: r.gc_percent, basePairCount: r.base_pair_count, region: r.region });
+
 
   const isVienna = r._source === 'vienna';
-  const ensembleEnergy = r.ensemble_energy != null ? r.ensemble_energy.toFixed(1) : '--';
-  const ensembleDiversity = r.ensemble_diversity != null ? r.ensemble_diversity.toFixed(2) : '--';
+  const ensembleEnergy = r.ensemble_energy != null ? metricNumber(r.ensemble_energy,1) : '--';
+  const ensembleDiversity = r.ensemble_diversity != null ? metricNumber(r.ensemble_diversity,2) : '--';
 
   let h = '';
   // Metrics grid
   h += `<div class="rna-info-grid" style="margin-top:16px">
-    <div class="rna-info-box"><div class="rna-info-value">${r.mfe.toFixed(1)}</div><div class="rna-info-label">${t('rna_mfe')} (kcal/mol)</div></div>
+    <div class="rna-info-box"><div class="rna-info-value">${metricNumber(r.mfe,1)}</div><div class="rna-info-label">${t('rna_mfe')} (kcal/mol)</div></div>
     <div class="rna-info-box"><div class="rna-info-value">${r.base_pair_count}</div><div class="rna-info-label">${t('rna_pairs')}</div></div>
     <div class="rna-info-box"><div class="rna-info-value">${ensembleEnergy}</div><div class="rna-info-label">${t('rna_ensemble_energy')}</div></div>
     <div class="rna-info-box"><div class="rna-info-value">${ensembleDiversity}</div><div class="rna-info-label">${t('rna_ensemble_diversity')}</div></div>
@@ -2196,9 +2415,9 @@ function colorDotBracket(seq, str) {
     const stl = str.slice(i, i + ll);
     h += `<span style="color:#64748b">${String(i + 1).padStart(5)}</span>  ${sl}\n<span style="color:#64748b">     </span>  `;
     for (const c of stl) {
-      if (c === '(') h += `<span style="color:#34d399">${c}</span>`;
-      else if (c === ')') h += `<span style="color:#60a5fa">${c}</span>`;
-      else h += `<span style="color:#475569">${c}</span>`;
+      if (c === '(') h += `<span style="color:#34d399">${escapeHTML(c)}</span>`;
+      else if (c === ')') h += `<span style="color:#60a5fa">${escapeHTML(c)}</span>`;
+      else h += `<span style="color:#475569">${escapeHTML(c)}</span>`;
     }
     h += '\n\n';
   }
@@ -2678,22 +2897,31 @@ function attachChartHover(svgEl, cfg) {
 // ESMFold
 // ══════════════════════════════════════════════════════════════════
 let esmViewer=null,lastPDB='';
-async function runESMFold(){const protein=document.getElementById('pa-protein-input').value.trim().toUpperCase().replace(/[^A-Z]/g,'');const eE=document.getElementById('esm-err-msg'),eT=document.getElementById('esm-err-text');eE.classList.remove('visible');
-if(!protein){eT.textContent=t('err_protein_empty');eE.classList.add('visible');return;}if(protein.length>400){eT.textContent=t('err_esm_long');eE.classList.add('visible');return;}
-const btn=document.getElementById('esm-run-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> '+t('esm_generating');
-try{const r=await fetch('https://api.esmatlas.com/foldSequence/v1/pdb/',{method:'POST',headers:{'Content-Type':'text/plain'},body:protein});if(!r.ok)throw new Error('ESMFold API: '+r.status);const pdb=await r.text();lastPDB=pdb;
-const bf=[];for(const l of pdb.split('\n')){if(l.startsWith('ATOM')&&l.length>60){const b=parseFloat(l.slice(60,66).trim());if(!isNaN(b))bf.push(b);}}let avg=bf.length?bf.reduce((a,b)=>a+b,0)/bf.length:0;
-// ESM Atlas API returns pLDDT in 0-1 scale; normalize to 0-100 if needed
-const bfMax=bf.length?Math.max(...bf):0;if(bfMax<=1.5)avg*=100;
-document.getElementById('esm-results').style.display='block';
-saveHistory('esmfold',{proteinInput:protein,residueCount:protein.length,plddt:avg});
-document.getElementById('esm-info').innerHTML=`<span class="esm-badge" style="background:var(--green-lt);color:var(--green)">${t('esm_length')}: ${protein.length}</span><span class="esm-badge" style="background:${avg>70?'var(--green-lt)':avg>50?'var(--amber-lt)':'var(--red-lt)'};color:${avg>70?'var(--green)':avg>50?'var(--amber)':'var(--red)'}">${t('esm_avg_plddt')}: ${avg.toFixed(1)}</span>`;
-const vd=document.getElementById('esm-viewer');vd.innerHTML='';esmViewer=$3Dmol.createViewer(vd,{backgroundColor:'#0f172a'});esmViewer.addModel(pdb,'pdb');setESMStyle('cartoon');setESMColor('spectrum');esmViewer.zoomTo();esmViewer.render();
-document.getElementById('esm-results').scrollIntoView({behavior:'smooth',block:'nearest'});}
-catch(e){eT.textContent=e.message||'Error';eE.classList.add('visible');}
-finally{btn.disabled=false;btn.innerHTML='<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 2.5a1 1 0 0 1 1.47-.88l9 5a1 1 0 0 1 0 1.76l-9 5A1 1 0 0 1 3.5 12.5v-10z"/></svg> <span data-i18n="esm_run_btn">'+t('esm_run_btn')+'</span>';}}
+async function runESMFold(){
+  const protein=legacyInput('esmfold'),eE=document.getElementById('esm-err-msg'),eT=document.getElementById('esm-err-text');eE.classList.remove('visible');
+  if(!protein||/[^ACDEFGHIKLMNPQRSTVWY]/.test(protein)||protein.length>400){eT.textContent=currentLang==='ja'?'標準アミノ酸のみ、1〜400 残基で入力してください。':'Use 1–400 standard amino acids.';eE.classList.add('visible');return;}
+  const run=beginLegacyRun('esmfold',protein),btn=document.getElementById('esm-run-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> '+t('esm_generating');
+  try{const r=await fetch('https://api.esmatlas.com/foldSequence/v1/pdb/',{method:'POST',headers:{'Content-Type':'text/plain'},body:protein});if(!r.ok)throw new Error('ESMFold API: '+r.status);const pdb=await r.text();
+    if(!pdb.split('\n').some(line=>line.startsWith('ATOM')))throw new Error('No protein structure was returned');
+    const result={pdb,protein,plddt:pdbConfidence(pdb),residueCount:protein.length};
+    finishLegacyRun(run,result,{proteinInput:protein,residueCount:protein.length,plddt:result.plddt},()=>displayESMFoldResult(result));
+  }catch(e){failLegacyRun(run,e);if(legacyCanRender(run)){eT.textContent=e.message||'Error';eE.classList.add('visible');}}
+  finally{btn.disabled=false;btn.innerHTML='<span data-i18n="esm_run_btn">'+t('esm_run_btn')+'</span>';}
+}
+function pdbConfidence(pdb){
+  const bf=[];for(const line of pdb.split('\n'))if(line.startsWith('ATOM')){const value=Number.parseFloat(line.slice(60,66));if(Number.isFinite(value))bf.push(value);}
+  if(!bf.length)return null;const avg=bf.reduce((a,b)=>a+b,0)/bf.length;return Math.max(...bf)<=1.5?avg*100:avg;
+}
+function displayESMFoldResult(result){
+  const pdb=result.pdb,avg=result.plddt;lastPDB=pdb;
+  document.getElementById('esm-results').style.display='block';
+  document.getElementById('esm-info').innerHTML=`<span class="esm-badge" style="background:var(--green-lt);color:var(--green)">${t('esm_length')}: ${result.residueCount}</span><span class="esm-badge">${t('esm_avg_plddt')}: ${metricNumber(avg,1)}</span>`;
+  const vd=document.getElementById('esm-viewer');vd.innerHTML='';
+  if(typeof $3Dmol==='undefined'){vd.textContent=currentLang==='ja'?'3D 表示を読み込めません。PDB は書き出せます。':'3D viewer unavailable. You can download the PDB.';return;}
+  esmViewer=$3Dmol.createViewer(vd,{backgroundColor:'#0f172a'});esmViewer.addModel(pdb,'pdb');setESMStyle('cartoon');setESMColor('spectrum');esmViewer.zoomTo();esmViewer.render();
+}
 
-function setESMStyle(s){if(!esmViewer)return;esmViewer.setStyle({},{});if(s==='cartoon')esmViewer.setStyle({},{cartoon:{color:'spectrum'}});else if(s==='stick')esmViewer.setStyle({},{stick:{colorscheme:'rasmol'}});else if(s==='sphere')esmViewer.setStyle({},{sphere:{colorscheme:'rasmol',scale:.3}});esmViewer.render();document.querySelectorAll('#esm-controls .viewer-ctrl-btn').forEach(b=>b.classList.remove('active'));if(event&&event.target)event.target.classList.add('active');}
+function setESMStyle(s){if(!esmViewer)return;esmViewer.setStyle({},{});if(s==='cartoon')esmViewer.setStyle({},{cartoon:{color:'spectrum'}});else if(s==='stick')esmViewer.setStyle({},{stick:{colorscheme:'rasmol'}});else if(s==='sphere')esmViewer.setStyle({},{sphere:{colorscheme:'rasmol',scale:.3}});esmViewer.render();document.querySelectorAll('#esm-controls .viewer-ctrl-btn').forEach(b=>b.classList.remove('active'));if(typeof event!=='undefined'&&event?.target)event.target.classList.add('active');}
 function setESMColor(s){if(!esmViewer)return;if(s==='spectrum')esmViewer.setStyle({},{cartoon:{color:'spectrum'}});else if(s==='confidence')esmViewer.setStyle({},{cartoon:{colorfunc:function(a){let b=a.b;if(b<=1.5)b*=100;if(b>90)return'#0000FF';if(b>70)return'#00AAFF';if(b>50)return'#FFAA00';return'#FF0000';}}});esmViewer.render();}
 function downloadPDB(){if(!lastPDB)return;triggerDownload(new Blob([lastPDB],{type:'text/plain'}),'esmfold.pdb');}
 
@@ -2701,29 +2929,36 @@ function downloadPDB(){if(!lastPDB)return;triggerDownload(new Blob([lastPDB],{ty
 // BLAST
 // ══════════════════════════════════════════════════════════════════
 let blastRID=null;
-async function runBLAST(){const protein=document.getElementById('pa-protein-input').value.trim().toUpperCase().replace(/[^A-Z]/g,'');const eE=document.getElementById('blast-err-msg'),eT=document.getElementById('blast-err-text');eE.classList.remove('visible');
-if(!protein){eT.textContent=t('err_protein_empty');eE.classList.add('visible');return;}
-const btn=document.getElementById('blast-run-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> '+t('blast_searching');
-const c=document.getElementById('blast-results');c.style.display='block';c.innerHTML=`<div class="blast-progress"><div class="spinner-large"></div><p>${t('blast_waiting')}</p></div>`;
-try{const pp=new URLSearchParams({CMD:'Put',PROGRAM:'blastp',DATABASE:document.getElementById('blast-db').value,QUERY:protein,FORMAT_TYPE:'JSON2_S',HITLIST_SIZE:'10'});
-const pr=await fetch('https://blast.ncbi.nlm.nih.gov/blast/Blast.cgi',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:pp.toString()});const pt=await pr.text();const rm=pt.match(/RID = (\S+)/);if(!rm)throw new Error('Submit failed');blastRID=rm[1];
-let att=0;const mx=30;while(att<mx){await new Promise(r=>setTimeout(r,5000));att++;const gp=new URLSearchParams({CMD:'Get',RID:blastRID,FORMAT_TYPE:'JSON2_S'});const gr=await fetch('https://blast.ncbi.nlm.nih.gov/blast/Blast.cgi?'+gp.toString());const gt=await gr.text();
-if(gt.includes('Status=WAITING')){c.innerHTML=`<div class="blast-progress"><div class="spinner-large"></div><p>${t('blast_waiting')} (${att*5}s)</p></div>`;continue;}
-if(gt.includes('Status=FAILED'))throw new Error('BLAST failed');if(gt.includes('Status=UNKNOWN'))throw new Error('Job expired');
-try{const ji=gt.indexOf('{');if(ji===-1)throw new Error('No JSON');displayBLASTResults(JSON.parse(gt.slice(ji)));return;}catch(pe){if(att<mx)continue;throw pe;}}throw new Error('Timeout');}
-catch(e){eT.textContent=e.message||'Error';eE.classList.add('visible');c.style.display='none';}
-finally{btn.disabled=false;btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> <span data-i18n="blast_run_btn">'+t('blast_run_btn')+'</span>';}}
+async function runBLAST(){
+  const protein=legacyInput('blast'),settings=legacySettings('blast'),eE=document.getElementById('blast-err-msg'),eT=document.getElementById('blast-err-text');eE.classList.remove('visible');
+  if(!protein||/[^ACDEFGHIKLMNPQRSTVWY]/.test(protein)){eT.textContent=currentLang==='ja'?'標準アミノ酸で入力してください。':'Enter standard amino acids.';eE.classList.add('visible');return;}
+  const run=beginLegacyRun('blast',protein,settings),btn=document.getElementById('blast-run-btn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> '+t('blast_searching');
+  const c=document.getElementById('blast-results');c.style.display='block';c.innerHTML=`<div class="blast-progress"><div class="spinner-large"></div><p>${t('blast_waiting')}</p></div>`;
+  try{const pp=new URLSearchParams({CMD:'Put',PROGRAM:settings.program,DATABASE:settings.database,QUERY:protein,FORMAT_TYPE:'JSON2_S',HITLIST_SIZE:String(settings.hitListSize)});
+    const pr=await fetch('https://blast.ncbi.nlm.nih.gov/blast/Blast.cgi',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:pp.toString()});if(!pr.ok)throw new Error('BLAST submit: '+pr.status);const pt=await pr.text(),rm=pt.match(/RID = (\S+)/);if(!rm)throw new Error('Submit failed');const rid=rm[1];
+    for(let att=1;att<=30;att++){
+      await new Promise(resolve=>setTimeout(resolve,5000));
+      if(!legacySameSession(run))return;
+      const gp=new URLSearchParams({CMD:'Get',RID:rid,FORMAT_TYPE:'JSON2_S'}),gr=await fetch('https://blast.ncbi.nlm.nih.gov/blast/Blast.cgi?'+gp.toString());if(!gr.ok)throw new Error('BLAST fetch: '+gr.status);const gt=await gr.text();
+      if(gt.includes('Status=WAITING')){if(legacyCanRender(run))c.innerHTML=`<div class="blast-progress"><div class="spinner-large"></div><p>${t('blast_waiting')} (${att*5}s)</p></div>`;continue;}
+      if(gt.includes('Status=FAILED'))throw new Error('BLAST failed');if(gt.includes('Status=UNKNOWN'))throw new Error('Job expired');
+      const ji=gt.indexOf('{');if(ji<0)continue;
+      let d;try{d=JSON.parse(gt.slice(ji));}catch{continue;}
+      const hits=d.BlastOutput2?.[0]?.report?.results?.search?.hits||[],desc=hits[0]?.description?.[0],hsp=hits[0]?.hsps?.[0];
+      const result={...d,rid};finishLegacyRun(run,result,{proteinInput:protein,database:settings.database,hitsCount:hits.length,topHitName:desc?.title||'',topHitAccession:desc?.accession||'',topHitEvalue:hsp?.evalue??null,topHitIdentity:hsp?.align_len?hsp.identity/hsp.align_len*100:null},()=>{blastRID=rid;displayBLASTResults(result);});return;
+    }
+    throw new Error('BLAST polling timed out');
+  }catch(e){failLegacyRun(run,e);if(legacyCanRender(run)){eT.textContent=e.message||'Error';eE.classList.add('visible');c.style.display='none';}}
+  finally{btn.disabled=false;btn.innerHTML='<span data-i18n="blast_run_btn">'+t('blast_run_btn')+'</span>';}
+}
 
-function displayBLASTResults(d){const c=document.getElementById('blast-results');try{const sr=d.BlastOutput2?.[0]?.report?.results?.search;if(!sr){c.innerHTML=`<p style="color:var(--muted);padding:16px">${t('blast_no_hits')}</p>`;return;}
+function displayBLASTResults(d){const c=document.getElementById('blast-results');c.style.display='block';blastRID=d.rid||null;try{const sr=d.BlastOutput2?.[0]?.report?.results?.search;if(!sr){c.innerHTML=`<p style="color:var(--muted);padding:16px">${t('blast_no_hits')}</p>`;return;}
 const hits=sr.hits||[];if(!hits.length){c.innerHTML=`<p style="color:var(--muted);padding:16px">${t('blast_no_hits')}</p>`;return;}
-const blastProtein=document.getElementById('pa-protein-input').value.trim().toUpperCase().replace(/[^A-Z]/g,'');
-const topDesc=hits[0]?.description?.[0];const topHsp=hits[0]?.hsps?.[0];
-saveHistory('blast',{proteinInput:blastProtein.slice(0,2000),hitsCount:hits.length,topHitName:topDesc?.title?.slice(0,100)||'',topHitAccession:topDesc?.accession||'',topHitEvalue:topHsp?.evalue,topHitIdentity:topHsp?.identity&&topHsp?.align_len?(topHsp.identity/topHsp.align_len*100):0});
-const ql=sr.query_len||1;let h=`<p style="font-size:.8rem;color:var(--text-secondary);margin:14px 0 16px"><strong>${hits.length}</strong> hits${blastRID?` · <a href="https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Get&RID=${blastRID}&FORMAT_TYPE=HTML" target="_blank" style="color:var(--green)">View on NCBI</a>`:''}</p>`;
+const ql=sr.query_len||1;let h=`<p style="font-size:.8rem;color:var(--text-secondary);margin:14px 0 16px"><strong>${hits.length}</strong> hits${blastRID?` · <a href="https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Get&RID=${encodeURIComponent(blastRID)}&FORMAT_TYPE=HTML" target="_blank" style="color:var(--green)">View on NCBI</a>`:''}</p>`;
 for(const hit of hits.slice(0,10)){const desc=hit.description?.[0]||{};const acc=desc.accession||'';const title=desc.title||'Unknown';const org=desc.sciname||'';const hsp=hit.hsps?.[0]||{};
-const id=hsp.identity&&hsp.align_len?(hsp.identity/hsp.align_len*100).toFixed(1):'?';const ev=hsp.evalue!==undefined?hsp.evalue.toExponential(1):'?';const sc=hsp.bit_score?hsp.bit_score.toFixed(0):'?';const cv=hsp.query_to&&hsp.query_from?((hsp.query_to-hsp.query_from+1)/ql*100).toFixed(0):'?';
-h+=`<div class="blast-hit"><div class="blast-hit-header"><div class="blast-hit-name"><a href="https://www.ncbi.nlm.nih.gov/protein/${acc}" target="_blank">${acc}</a> ${title}${org?` <span style="font-size:.72rem;color:var(--muted);font-style:italic">— ${org}</span>`:''}</div></div><div class="blast-stats"><span class="blast-stat"><strong>${t('blast_identity')}:</strong> ${id}%</span><span class="blast-stat"><strong>${t('blast_evalue')}:</strong> ${ev}</span><span class="blast-stat"><strong>${t('blast_score')}:</strong> ${sc}</span><span class="blast-stat"><strong>${t('blast_coverage')}:</strong> ${cv}%</span></div>`;
-if(hsp.qseq&&hsp.hseq&&hsp.midline){h+=`<div class="blast-alignment">Query  ${hsp.qseq.slice(0,60)}\n       ${hsp.midline.slice(0,60)}\nSbjct  ${hsp.hseq.slice(0,60)}</div>`;}h+='</div>';}c.innerHTML=h;}catch(e){c.innerHTML=`<p style="color:var(--red);padding:16px">Error: ${e.message}</p>`;}}
+const id=hsp.identity&&hsp.align_len?(hsp.identity/hsp.align_len*100).toFixed(1):'?';const ev=typeof hsp.evalue==='number'&&Number.isFinite(hsp.evalue)?hsp.evalue.toExponential(1):'—';const sc=hsp.bit_score?hsp.bit_score.toFixed(0):'?';const cv=hsp.query_to&&hsp.query_from?((hsp.query_to-hsp.query_from+1)/ql*100).toFixed(0):'?';
+h+=`<div class="blast-hit"><div class="blast-hit-header"><div class="blast-hit-name"><a href="https://www.ncbi.nlm.nih.gov/protein/${encodeURIComponent(acc)}" target="_blank" rel="noopener noreferrer">${escapeHTML(acc)}</a> ${escapeHTML(title)}${org?` <span style="font-size:.72rem;color:var(--muted);font-style:italic">— ${escapeHTML(org)}</span>`:''}</div></div><div class="blast-stats"><span class="blast-stat"><strong>${t('blast_identity')}:</strong> ${id}%</span><span class="blast-stat"><strong>${t('blast_evalue')}:</strong> ${ev}</span><span class="blast-stat"><strong>${t('blast_score')}:</strong> ${sc}</span><span class="blast-stat"><strong>${t('blast_coverage')}:</strong> ${cv}%</span></div>`;
+if(hsp.qseq&&hsp.hseq&&hsp.midline){h+=`<div class="blast-alignment">Query  ${escapeHTML(hsp.qseq.slice(0,60))}\n       ${escapeHTML(hsp.midline.slice(0,60))}\nSbjct  ${escapeHTML(hsp.hseq.slice(0,60))}</div>`;}h+='</div>';}c.innerHTML=h;}catch(e){c.innerHTML=`<p style="color:var(--red);padding:16px">Error: ${escapeHTML(e.message)}</p>`;}}
 
 // ── Keyboard shortcuts & init ──
 document.getElementById('seq-input').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))runOptimization();});
@@ -2738,6 +2973,7 @@ let historyItems = [];
 
 function updateAuthUI() {
   currentUser = window.currentUser || null;
+  window.legacyAuthChanged?.();
   const btn = document.getElementById('auth-btn');
   const histBtn = document.getElementById('history-btn');
   const menu = document.getElementById('auth-menu');
@@ -2810,28 +3046,27 @@ function closeHistoryPanel() {
 }
 
 // ── Save to Firestore ──
-async function saveHistory(type, data) {
-  if (!currentUser || !window.fbDb) return;
-  try {
-    const doc = {
-      uid: currentUser.uid,
-      createdAt: window.fbTimestamp.now(),
-      type: type,
-      customName: null,
-      ...data
-    };
-    // Truncate long strings
-    if (doc.dnaOutput && doc.dnaOutput.length > 9000) doc.dnaOutput = doc.dnaOutput.slice(0, 9000);
-    if (doc.proteinInput && doc.proteinInput.length > 6200) doc.proteinInput = doc.proteinInput.slice(0, 6200);
-    await window.fbAddDoc(window.fbCollection(window.fbDb, 'history'), doc);
+async function saveHistory(type,data,run){
+  if(!run||!run.authSession||!window.fbDb||!legacySameSession(run))return;
+  try{
+    const {result,...fields}=data;
+    const doc=JSON.parse(JSON.stringify({...fields,uid:run.authSession.uid,type,customName:null,resultJSON:JSON.stringify(result??null)}));
+    if(new TextEncoder().encode(JSON.stringify(doc)).length>850000)throw new Error(currentLang==='ja'?'結果が大きいため従来の履歴には保存できません。実行履歴で保存状態を確認してください。':'This result is too large for legacy cloud history. Check the run history for its saved copy.');
+    doc.createdAt=window.fbTimestamp.now();
+    if(!legacySameSession(run))return;
+    const saved=await window.fbAddDoc(window.fbCollection(window.fbDb,'history'),doc);
+    if(!legacySameSession(run))return;
+    if(lastRun&&legacyActiveRuns.get(type)?.runId===run.runId)lastRun.historyId=saved.id;
     loadHistory();
-  } catch (e) { console.error('Save history error:', e); }
+  }catch(e){if(legacySameSession(run))integrationNotice(currentLang==='ja'?'履歴のクラウド保存に失敗しました。'+(e.message||''):'Cloud history could not be saved. '+(e.message||''));}
 }
+
 window.saveHistory = saveHistory;
 
 // ── Load from Firestore ──
 async function loadHistory() {
   if (!currentUser || !window.fbDb) return;
+  const session = currentUser;
   try {
     const q = window.fbQuery(
       window.fbCollection(window.fbDb, 'history'),
@@ -2839,6 +3074,7 @@ async function loadHistory() {
       window.fbOrderBy('createdAt', 'desc')
     );
     const snap = await window.fbGetDocs(q);
+    if (currentUser !== session || window.currentUser !== session) return;
     historyItems = [];
     snap.forEach(d => historyItems.push({ id: d.id, ...d.data() }));
     renderHistory();
@@ -2879,6 +3115,11 @@ function renderHistory() {
   body.innerHTML = html;
 }
 
+function escapeHTML(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function startRenameHistoryById(id) {
+  const item=historyItems.find(h=>h.id===id);
+  if(item)startRenameHistory(id,item.customName||'',t('history_rename_placeholder'));
+}
 function renderHistoryCard(item, time) {
   const typeConfig = {
     optimize: { icon: '🧬', cls: 'opt', label: t('history_type_opt') },
@@ -2894,77 +3135,88 @@ function renderHistoryCard(item, time) {
     const pShort = (item.proteinInput || '').slice(0, 20) + (item.proteinInput?.length > 20 ? '...' : '');
     const orgShort = (item.organism || '').split(' ').slice(0, 2).join(' ');
     title = `${pShort} → ${orgShort}`;
-    meta = `${item.strategy || 'cai_max'} | ${item.lengthNt || '?'} nt | GC ${(item.gcPercent || 0).toFixed(1)}%`;
+    meta = `${item.strategy || 'cai_max'} | ${item.lengthNt || '?'} nt | GC ${metricNumber(item.gcPercent,1)}%`;
   } else if (item.type === 'restriction') {
     title = t('history_type_re');
     meta = `${item.lengthNt || '?'} nt | ${item.totalSites || 0} sites`;
   } else if (item.type === 'rna') {
     title = t('history_type_rna');
-    meta = `${item.lengthNt || '?'} nt | MFE ${(item.mfe || 0).toFixed(1)} | ${item.region || 'full'}`;
+    meta = `${item.lengthNt || '?'} nt | MFE ${metricNumber(item.mfe,1)} | ${item.region || 'full'}`;
   } else if (item.type === 'esmfold') {
     title = t('history_type_esm');
-    meta = `${item.residueCount || '?'} aa | pLDDT ${(item.plddt || 0).toFixed(1)}`;
+    meta = `${item.residueCount || '?'} aa | pLDDT ${metricNumber(item.plddt,1)}`;
   } else if (item.type === 'blast') {
     title = t('history_type_blast');
     meta = `${item.hitsCount || 0} hits${item.topHitName ? ' | ' + item.topHitName.slice(0, 30) : ''}`;
   }
 
   const displayTitle = item.customName || title;
-  const safeTitle = displayTitle.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
-  const safePlaceholder = title.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+
 
   return `<div class="history-card">
     <div class="history-card-header">
       <div class="history-type-icon ${tc.cls}">${tc.icon}</div>
-      <div class="history-card-title" id="htitle-${item.id}">${displayTitle}</div>
-      <button class="history-rename-btn" onclick="startRenameHistory('${item.id}', '${safeTitle}', '${safePlaceholder}')" title="${t('history_rename_placeholder')}">&#9998;</button>
+      <div class="history-card-title" id="htitle-${item.id}">${escapeHTML(displayTitle)}</div>
+      <button class="history-rename-btn" onclick="startRenameHistoryById('${item.id}')" title="${t('history_rename_placeholder')}">&#9998;</button>
       <span style="font-size:.65rem;color:var(--muted)">${time}</span>
     </div>
-    <div class="history-card-meta">${meta}</div>
+    <div class="history-card-meta">${escapeHTML(meta)}</div>
     <div class="history-card-actions">
       <button onclick="restoreHistory('${item.id}')" data-i18n="history_restore">${t('history_restore')}</button>
+      ${item.type==='optimize'&&item.dnaOutput?`<button onclick="sendHistoryToWorkspace('${item.id}')">${currentLang==='ja'?'ワークスペースに追加':'Add to workspace'}</button>`:''}
       <button class="del-btn" onclick="deleteHistory('${item.id}')" data-i18n="history_delete">${t('history_delete')}</button>
     </div>
   </div>`;
 }
 
 // ── Restore history item ──
-function restoreHistory(id) {
-  const item = historyItems.find(h => h.id === id);
-  if (!item) return;
-  closeHistoryPanel();
-
-  if (item.type === 'optimize') {
-    switchTab('codon');
-    if (item.organism) { selectOrganism(item.organism); }
-    if (item.proteinInput) {
-      document.getElementById('seq-input').value = item.proteinInput;
-      document.getElementById('seq-len').textContent = item.proteinInput.replace(/[_*]/g, '').length + ' aa';
+function restoreHistory(id){
+  const item=historyItems.find(h=>h.id===id);if(!item)return;
+  let result=item.result||null;
+  if(item.resultJSON){try{result=JSON.parse(item.resultJSON);}catch{result=null;}}
+  const kind=item.originalInputType==='dna'?'dna':item.inputKind||(['restriction','rna'].includes(item.type)?'dna':'protein');
+  const sequence=item.sourceSequence||item.originalInput||(kind==='dna'?item.dnaInput:item.proteinInput)||'';
+  const settings={...(item.type==='optimize'?{inputType:item.originalInputType||'protein',organism:item.organism,strategy:item.strategy,temperature:item.temperature??0.2,seed:item.seed??0,generationMode:item.generationMode||'sample'}:item.type==='rna'?{region:item.region||'full',utr5:item.utr5||''}:item.type==='restriction'?{enzymeSet:item.enzymeSet||'common'}:item.type==='blast'?{database:item.database||'swissprot'}:{}),...item.settings};
+  if(!result&&item.dnaOutput)result={...item,predicted_dna:item.dnaOutput};
+  restoreLegacyRun({...item,runId:item.runId||item.id,sequence,kind,settings,result});
+  if(lastRun)lastRun.historyId=item.id;
+}
+function restoreLegacyRun(run){
+  clearLegacyResults();closeHistoryPanel();
+  const settings={...run.settings},panel=legacyPanel(run.type),sequence=run.sequence;
+  if(run.type==='optimize'){settings.strategy??=settings.model?.replace(/^ar-/, 'ar_').replace(/^mlm-/, 'mlm_');if(!settings.organism){const species=settings.species||run.species;settings.organism=species==='cre-chloroplast'?'Chlamydomonas reinhardtii chloroplast':allOrganisms.find(item=>'ct-'+item.id===species)?.name;}}
+  if(run.type==='optimize'){
+    setInputType(settings.inputType||(['dna','cds'].includes(run.kind)?'dna':'protein'));
+    if(settings.organism)selectOrganism(settings.organism);
+    const radio=document.querySelector(`input[name="strategy"][value="${settings.strategy||'cai_max'}"]`);if(radio)radio.checked=true;
+    document.getElementById('slider-temp').value=settings.temperature??0.2;
+    document.getElementById('optimization-seed').value=settings.seed??0;
+    document.getElementById('generation-mode').value=settings.generationMode||(settings.strategy==='cuo_handpick'?'greedy':'sample');
+    if(settings.strategy==='cuo_handpick'){
+      document.getElementById('handpick-min-weight').value=settings.handpick?.minWeight??0.5;
+      document.getElementById('handpick-avoid-pairs').checked=Boolean(settings.handpick?.avoidBadPairs);
+      document.getElementById('handpick-min-pair').value=settings.handpick?.minPairScore??0.5;
     }
-    if (item.strategy) {
-      const radio = document.querySelector(`input[name="strategy"][value="${item.strategy}"]`);
-      if (radio) { radio.checked = true; document.getElementById('slider-panel').classList.toggle('visible', CT_STRATEGIES.includes(item.strategy)); }
-    }
-    // Show results if DNA is saved
-    if (item.dnaOutput) {
-      lastDNA = item.dnaOutput;
-      lastProtein = (item.proteinInput || '').replace(/[_*]$/g, '');
-      showResults(item.dnaOutput, lastProtein, item.strategy || 'cai_max');
-    }
-  } else if (item.type === 'restriction' || item.type === 'rna') {
-    switchTab('seqanalysis');
-    if (item.dnaInput) {
-      document.getElementById('sa-dna-input').value = item.dnaInput;
-      document.getElementById('sa-seq-len').textContent = item.dnaInput.length + ' nt';
-    }
-  } else if (item.type === 'esmfold' || item.type === 'blast') {
-    switchTab('protein');
-    if (item.proteinInput) {
-      document.getElementById('pa-protein-input').value = item.proteinInput;
-      document.getElementById('pa-seq-len').textContent = item.proteinInput.length + ' aa';
-    }
+    updateStrategyPanel();document.getElementById('seq-input').value=sequence;
+    document.getElementById('seq-len').textContent=sequence.length+(inputType==='dna'?' nt':' aa');
+  }else if(panel==='seqanalysis'){
+    document.getElementById('sa-dna-input').value=sequence;document.getElementById('sa-seq-len').textContent=sequence.length+' nt';
+    document.getElementById('rna-utr-input').value=settings.utr5||'';document.getElementById('rna-region').value=['full','5utr','3utr'].includes(settings.region)?settings.region:'full';
+    document.getElementById('re-enzyme-set').value=settings.enzymeSet||'common';
+  }else{
+    document.getElementById('pa-protein-input').value=sequence;document.getElementById('pa-seq-len').textContent=sequence.length+' aa';
+    document.getElementById('blast-db').value=settings.database||'swissprot';
   }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  analysisOrigin={...run,panel,historical:true,translation:settings.translation,sourceKind:settings.sourceContext?.sourceKind,cdsBlocks:settings.sourceContext?.cdsBlocks};renderAnalysisOrigin();if(panel==='seqanalysis')window.renderProteinBridge?.(true);switchTab(panel);
+  const result=run.result;
+  if(result){
+    if(run.type==='optimize'){const dna=result.predicted_dna||result.candidates?.[0]?.sequence||result.sequence;if(dna){const protein=['dna','cds'].includes(run.kind)?translateDNA(sequence):sequence.replace(/[_*]$/,'');lastDNA=dna;lastProtein=protein;showResults(dna,protein,settings.strategy||'cai_max',{...result,runId:run.runId||run.jobId||run.id||result.runId,sourceRevisionId:run.revisionId||result.sourceRevisionId,modelVersion:result.modelVersion||result.candidates?.[0]?.modelVersion||settings.modelVersion,generationMode:result.generationMode||settings.generationMode},settings.organism);if(result.metrics)showExtendedMetrics(result.metrics);}}
+    else if(run.type==='restriction')displayRestrictionResults(result);
+    else if(run.type==='rna')displayRNAResults(result);
+    else if(run.type==='esmfold'&&result.pdb)displayESMFoldResult(result);
+    else if(run.type==='blast')displayBLASTResults(result);
+  }
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 // ── Rename history item (inline editing) ──
